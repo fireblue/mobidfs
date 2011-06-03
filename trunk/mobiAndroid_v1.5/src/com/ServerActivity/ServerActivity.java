@@ -7,9 +7,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -24,7 +21,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
 
@@ -32,36 +28,25 @@ import java.util.Enumeration;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothServerSocket;
-import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.media.MediaRecorder;
-import android.media.MediaScannerConnection;
-import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
-import android.os.StatFs;
-import android.os.SystemClock;
 import android.os.Vibrator;
-import android.telephony.TelephonyManager;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnKeyListener;
-import android.view.inputmethod.InputConnection;
 import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -75,7 +60,7 @@ public class ServerActivity extends Activity {
 	private Vibrator vbr = null;
 	
 	public static String LOCALLISTENIP = null;
-	public static String MASTERIP = "160.36.26.199";
+	public static String MASTERIP = "192.168.10.126";
 	private Handler handler = new Handler();
 	
 	private Thread tcplist = new Thread(new TCPListenThread());
@@ -94,8 +79,6 @@ public class ServerActivity extends Activity {
 	
 	private static DatabaseHandler dbh;
 	
-	public boolean sensorRecordOn = false;
-	
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -112,7 +95,7 @@ public class ServerActivity extends Activity {
         sm.startSensor();
         
         cam = new mobiCamera(ServerActivity.this);
-        startService(new Intent(ServerActivity.this, mobiGPSService.class));
+        //startService(new Intent(ServerActivity.this, mobiGPSService.class));
         
         setContentView(R.layout.main);
         tv = (TextView) findViewById(R.id.shellView);
@@ -127,7 +110,7 @@ public class ServerActivity extends Activity {
         setupBluetoothDevice();
         
         tv.setText("");
-        //this.tcpSend("160.36.26.199", 11314, "Join");
+        this.tcpSend("192.168.10.126", 11314, "Join");
         this.registerReceiver(this.mbr, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         tv.append(this.getDeviceInfo()+"\n");
         sv.smoothScrollTo(0, tv.getBottom());
@@ -177,7 +160,7 @@ public class ServerActivity extends Activity {
     	super.onResume();
     	sm.startSensor();
     	msound.startMeasure();
-    	startService(new Intent(ServerActivity.this, mobiGPSService.class));
+    	//startService(new Intent(ServerActivity.this, mobiGPSService.class));
     }
     
     @Override
@@ -657,11 +640,20 @@ public class ServerActivity extends Activity {
     		}
     		if (argv[0].equals("sensor"))
     		{
+    			// Remote case.
+    			if (pwd.contains("mobiHome/*") && !pwd.endsWith("mobiHome/"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "Sensor");
+    				return;
+    			}
+    			
+    			// Local case.
     			this.fs_sensor();
     			return;
     		}
+    		// Currently, camera does not support background service.
     		if (argv[0].equals("pic"))
-    		{
+    		{    			
     			cam.takePicture();
     			postMessage("[System Msg] Picture taken.\n");
     			cam.shutdown();
@@ -669,11 +661,27 @@ public class ServerActivity extends Activity {
     		}
     		if (argv[0].equals("vb"))
     		{
+    			// Remote case.
+    			if (pwd.contains("mobiHome/*") && !pwd.endsWith("mobiHome/"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "VB");
+    				return;
+    			}
+    			
+    			// Local case.
     			vbr.vibrate(300);
     			return;
     		}
     		if (argv[0].equals("loc"))
     		{
+    			// Remote case.
+    			if (pwd.contains("mobiHome/*") && !pwd.endsWith("mobiHome/"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "LOC");
+    				return;
+    			}
+    			
+    			// Local case.
     			String mloc = "\n----\nLocation:\n";
     			mloc += "Altitude: "+String.valueOf(mobiGPSService.altitude)+"\n";
     			mloc += "Latitude: "+String.valueOf(mobiGPSService.latitude)+"\n";
@@ -711,6 +719,14 @@ public class ServerActivity extends Activity {
     		}
     		if (argv[0].equals("setpublic"))
     		{
+    			// setup sensor public.
+    			if (argv[1].equals("sensor"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "Sensor|Public");
+    				return;
+    			}
+    			
+    			// handle files.
     			this.fs_setPublic(argv[1]);
     			return;
     		}
@@ -718,6 +734,52 @@ public class ServerActivity extends Activity {
     		{
     			this.fs_rmdir(argv[1]);
     			return;
+    		}
+    		if (argv[0].equals("slog"))
+    		{
+    			// Remote request, first go to system server to check access privilege.
+    			if (pwd.contains("mobiHome/*") && !pwd.endsWith("mobiHome/"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "Sensor|Log|"+argv[1]);
+    				return;
+    			}
+    			
+    			// Local case.
+    			if (argv[1].equals("on"))
+    				sm.isLogging = true;
+    			if (argv[1].equals("off"))
+    				sm.isLogging = false;
+    			if (argv[1].equals("cl"))
+    				sm.resetLog();
+    			return;
+    		}
+    		if (argv[0].equals("gps"))
+    		{
+    			// Remote request, first go to system server to check access privilege.
+    			if (pwd.contains("mobiHome/*") && !pwd.endsWith("mobiHome/"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "GPS|"+argv[1]);
+    				return;
+    			}
+    			
+    			// Local case.
+    			if (argv[1].equals("on"))
+    				this.gpsOn();
+    			if (argv[1].equals("off"))
+    				this.gpsOff();
+    			return;
+    		}
+    		if (argv[0].equals("preview"))
+    		{
+    			// Remote case.
+    			if (argv[1].contains("mobiHome/*") || pwd.contains("mobiHome/*"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "Preview|"+argv[1]);
+    				return;
+    			}
+    			
+    			// Local case.
+    			// TODO start another activity to handle file or pic preview
     		}
     	}
     	else if (argc == 3)
@@ -729,6 +791,14 @@ public class ServerActivity extends Activity {
     		}
     		if (argv[0].equals("setprivate")) // setprivate a.txt jliao2,mmc,eyes,mushroom
     		{
+    			// setup sensor as private to access list people.
+    			if (argv[1].equals("sensor"))
+    			{
+    				this.tcpSend(MASTERIP, 11314, "Sensor|Private|"+argv[2]);
+    				return;
+    			}
+    			
+    			// setup files.
     			this.fs_setPrivate(argv[1], argv[2]);
     			return;
     		}
@@ -1160,16 +1230,103 @@ public class ServerActivity extends Activity {
     	}
     	else
     	{
-    		if (!mbta.isEnabled()) // not enable, but potentially be available.
-    			info += "1;"+"100;potential;null;";
+    		// Bluetooth
+    		if (!mbta.isEnabled())
+    			info += "1;"+"100;potential;";
     		else
-    			info += "1;"+"100;"+mbta.getName()+ "+" + mbta.getAddress()+";null;";
+    			info += "1;"+"100;"+mbta.getName()+ "+" + mbta.getAddress()+";";
+    		
+    		// GPS location
+    		if (mobiGPSService.altitude != 0 && mobiGPSService.latitude != 0 && mobiGPSService.longitude != 0 && mobiGPSService.accuracy != 0)
+    			info += String.valueOf(mobiGPSService.longitude)+","+String.valueOf(mobiGPSService.latitude)+","+String.valueOf(mobiGPSService.altitude)+","+String.valueOf(mobiGPSService.accuracy)+";";
+    		else
+    			info += "null;";
+    		
+    		
     		if (ServerActivity.blevel == 0)
     			info += "100";
     		else
     			info += String.valueOf(ServerActivity.blevel);
     	}
     	return info;
+    }
+    
+    public String getSensorInfo()
+    {
+    	String info = "Sensor|";
+    	if (sm.sensorAvaliable(Sensor.TYPE_ACCELEROMETER)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_GRAVITY)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_GYROSCOPE)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_LIGHT)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_LINEAR_ACCELERATION)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_MAGNETIC_FIELD)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_ORIENTATION)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_PRESSURE)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_PROXIMITY)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_ROTATION_VECTOR)) info += "1";  else info += "0";
+    	if (sm.sensorAvaliable(Sensor.TYPE_TEMPERATURE)) info += "1";  else info += "0";
+    	
+    	return info;
+    }
+    
+    public String [] getSensorValue(int type)
+    {
+    	String [] val = new String[3];
+    	switch (type)
+    	{
+    		case Sensor.TYPE_ACCELEROMETER: 
+    			val[0] = String.valueOf(sm.accX);
+    			val[1] = String.valueOf(sm.accY);
+    			val[2] = String.valueOf(sm.accZ);
+    			return val;
+    		case Sensor.TYPE_GRAVITY:
+    			val[0] = String.valueOf(sm.gravityX);
+    			val[1] = String.valueOf(sm.gravityY);
+    			val[2] = String.valueOf(sm.gravityZ);
+    			return val;
+    		case Sensor.TYPE_GYROSCOPE:
+    			val[0] = String.valueOf(sm.spin);
+    			val[1] = String.valueOf(sm.output);
+    			val[2] = String.valueOf(sm.input);
+    			return val;
+    		case Sensor.TYPE_LIGHT:
+    			val[0] = String.valueOf(sm.light);
+    			return val;
+    		case Sensor.TYPE_MAGNETIC_FIELD:
+    			val[0] = String.valueOf(sm.magX);
+    			val[1] = String.valueOf(sm.magY);
+    			val[2] = String.valueOf(sm.magZ);
+    			return val;
+    		case Sensor.TYPE_ORIENTATION:
+    			val[0] = String.valueOf(sm.rotationX);
+    			val[1] = String.valueOf(sm.rotationY);
+    			val[2] = String.valueOf(sm.rotationZ);
+    			return val;
+    		case Sensor.TYPE_PROXIMITY:
+    			val[0] = String.valueOf(sm.proximity);
+    			return val;
+    		default: return val;
+    	}
+    }
+    
+    public void gpsOn()
+    {
+    	startService(new Intent(ServerActivity.this, mobiGPSService.class));
+    }
+    
+    public void gpsOff()
+    {
+    	stopService(new Intent(ServerActivity.this, mobiGPSService.class));
+    }
+    
+    public String [] getLocationValue()
+    {
+    	String [] val = new String[4];
+    	val[0] = String.valueOf(mobiGPSService.longitude);
+    	val[1] = String.valueOf(mobiGPSService.latitude);
+    	val[2] = String.valueOf(mobiGPSService.altitude);
+    	val[3] = String.valueOf(mobiGPSService.accuracy);
+    	return val;
     }
     
     private static boolean bt_ok = false;
@@ -1328,41 +1485,42 @@ public class ServerActivity extends Activity {
     public class SensorMaintenance implements SensorEventListener {
     	
     	private SensorManager mSensorManager;
+    	private boolean isLogging;
     	
     	// Accelerometer Service
-    	public Sensor Accelerometer;
+    	private Sensor Accelerometer;
     	public double accX;
     	public double accY;
     	public double accZ;
     	
     	// Gyroscope
-    	public Sensor Gyroscopemeter;
+    	private Sensor Gyroscopemeter;
     	public double spin;
     	public double output;
     	public double input;
     	
     	// Light
-    	public Sensor Lightmeter;
+    	private Sensor Lightmeter;
     	public double light;
     	
     	// Magnetic Field
-    	public Sensor Magnetometer;
+    	private Sensor Magnetometer;
     	public double magX;
     	public double magY;
     	public double magZ;
     	
     	// Orientation
-    	public Sensor Orientationmeter;
+    	private Sensor Orientationmeter;
     	public double rotationX;
     	public double rotationY;
     	public double rotationZ;
     	
     	// Proximity
-    	public Sensor Proximitymeter;
+    	private Sensor Proximitymeter;
     	public double proximity;
     	
     	// Gravity
-    	public Sensor Gravitymeter;
+    	private Sensor Gravitymeter;
     	public double gravityX;
     	public double gravityY;
     	public double gravityZ;
@@ -1396,6 +1554,49 @@ public class ServerActivity extends Activity {
     		this.Gravitymeter = mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
     	}
     	
+    	public boolean sensorAvaliable(int s)
+    	{
+    		switch (s)
+    		{
+	    		case Sensor.TYPE_ACCELEROMETER: return true;
+	    		case Sensor.TYPE_GYROSCOPE: return true;
+	    		case Sensor.TYPE_LIGHT: return true;
+	    		case Sensor.TYPE_MAGNETIC_FIELD: return true;
+	    		case Sensor.TYPE_ORIENTATION: return true;
+	    		case Sensor.TYPE_PROXIMITY: return true;
+	    		case Sensor.TYPE_GRAVITY: return true;
+	    		default: return false;
+    		}
+    	}
+    	
+    	public void startLogging()
+    	{
+    		this.isLogging = true;
+    	}
+    	
+    	public void stopLogging()
+    	{
+    		this.isLogging = false;
+    	}
+    	
+    	public void resetLog()
+    	{
+    		File accf = new File("/mnt/sdcard/sensor/"+this.senAccelerometer);
+    		accf.deleteOnExit();
+    		File lightf = new File("/mnt/sdcard/sensor/"+this.senLightmeter);
+    		lightf.deleteOnExit();
+    		File magf = new File("/mnt/sdcard/sensor/"+this.senMagnetometer);
+    		magf.deleteOnExit();
+    		File orif = new File("/mnt/sdcard/sensor/"+this.senOrientationmeter);
+    		orif.deleteOnExit();
+    		File proxf = new File("/mnt/sdcard/sensor/"+this.senProximitymeter);
+    		proxf.deleteOnExit();
+    		File gravf = new File("/mnt/sdcard/sensor/"+this.senGravitymeter);
+    		gravf.deleteOnExit();
+    		File gyrf = new File("/mnt/sdcard/sensor/"+this.senGyroscopemeter);
+    		gyrf.deleteOnExit();
+    	}
+    	
     	// Start sensing
     	public void startSensor()
     	{
@@ -1407,40 +1608,13 @@ public class ServerActivity extends Activity {
     		mSensorManager.registerListener(this, this.Proximitymeter, SensorManager.SENSOR_DELAY_UI);
     		mSensorManager.registerListener(this, this.Gravitymeter, SensorManager.SENSOR_DELAY_UI);
     		
+    		if (!isLogging) return;
     		try
     		{
     			File senDir = new File("/mnt/sdcard/sensor/");
     			if (!senDir.exists()) senDir.mkdir();
     			
     			File accf = new File("/mnt/sdcard/sensor/"+this.senAccelerometer);
-    			accf.deleteOnExit();
-    			if (!accf.exists()) accf.createNewFile();
-    			
-    			File lightf = new File("/mnt/sdcard/sensor/"+this.senLightmeter);
-    			lightf.deleteOnExit();
-    			if (!lightf.exists()) lightf.createNewFile();
-    			
-    			File magf = new File("/mnt/sdcard/sensor/"+this.senMagnetometer);
-    			magf.deleteOnExit();
-    			if (!magf.exists()) magf.createNewFile();
-    			
-    			File orif = new File("/mnt/sdcard/sensor/"+this.senOrientationmeter);
-    			orif.deleteOnExit();
-    			if (!orif.exists()) orif.createNewFile();
-    			
-    			File proxf = new File("/mnt/sdcard/sensor/"+this.senOrientationmeter);
-    			orif.deleteOnExit();
-    			if (!proxf.exists()) proxf.createNewFile();
-    			
-    			File gravf = new File("/mnt/sdcard/sensor/"+this.senGravitymeter);
-    			gravf.deleteOnExit();
-    			if (!gravf.exists()) gravf.createNewFile();
-    			
-    			File gyrf = new File("/mnt/sdcard/sensor/"+this.senGyroscopemeter);
-    			gyrf.deleteOnExit();
-    			if (!gyrf.exists()) gyrf.createNewFile();
-    			
-    			/*File accf = new File("/mnt/sdcard/sensor/"+this.senAccelerometer);
     			if (!accf.exists()) accf.createNewFile();
     			accfos = new FileOutputStream(accf, false);
     			
@@ -1456,7 +1630,7 @@ public class ServerActivity extends Activity {
     			if (!orif.exists()) orif.createNewFile();
     			orifos = new FileOutputStream(orif, false);
     			
-    			File proxf = new File("/mnt/sdcard/sensor/"+this.senOrientationmeter);
+    			File proxf = new File("/mnt/sdcard/sensor/"+this.senProximitymeter);
     			if (!proxf.exists()) proxf.createNewFile();
     			proxfos = new FileOutputStream(proxf, false);
     			
@@ -1466,7 +1640,7 @@ public class ServerActivity extends Activity {
     			
     			File gyrf = new File("/mnt/sdcard/sensor/"+this.senGyroscopemeter);
     			if (!gyrf.exists()) gyrf.createNewFile();
-    			gyrfos = new FileOutputStream(gyrf, false);*/
+    			gyrfos = new FileOutputStream(gyrf, false);
     			
     		} catch (Exception e)
     		{
@@ -1487,7 +1661,8 @@ public class ServerActivity extends Activity {
     		mSensorManager.unregisterListener(this, this.Proximitymeter);
     		mSensorManager.unregisterListener(this, this.Gravitymeter);
     		
-    		/*try
+    		if (!isLogging) return;
+    		try
     		{
     			accfos.close();
     			lightfos.close();
@@ -1500,7 +1675,7 @@ public class ServerActivity extends Activity {
     		{
     			Log.e("Sensor", e.getMessage());
     			postMessage("[System Msg] Sensor File Close Failed.\n");
-    		}*/
+    		}
     		
     	}
     	
@@ -1513,20 +1688,15 @@ public class ServerActivity extends Activity {
     			this.accY = event.values[1];
     			this.accZ = event.values[2];
     			
-    			if (sensorRecordOn)
+    			if (isLogging)
     			{
     				try
 	    			{
-	    				String str = String.valueOf(this.accX) + ";" + String.valueOf(this.accY) + ";" + String.valueOf(this.accZ);
+    					Date d = new Date();
+	    				String str = d.toGMTString()+":"+String.valueOf(this.accX) + ";" + String.valueOf(this.accY) + ";" + String.valueOf(this.accZ);
 	    				byte [] buf = str.getBytes();
-	    				File f = new File("/mnt/sdcard/sensor/"+this.senAccelerometer);
-	    				f.deleteOnExit();
-	    				if (!f.exists())
-	    					f.createNewFile();
-	    				FileOutputStream fos = new FileOutputStream(f);
 	    				accfos.write(buf);
 	    				accfos.flush();
-	    				accfos.close();
 	    			}
 	    			catch(Exception e)
 	    			{
@@ -1542,20 +1712,15 @@ public class ServerActivity extends Activity {
     			this.output = event.values[1];
     			this.input = event.values[2];
     			
-    			if (sensorRecordOn)
+    			if (isLogging)
     			{
 	    			try
 	    			{
-	    				String str = String.valueOf(this.spin) + ";" + String.valueOf(this.output) + ";" + String.valueOf(this.input);
+	    				Date d = new Date();
+	    				String str = d.toGMTString()+":"+String.valueOf(this.spin) + ";" + String.valueOf(this.output) + ";" + String.valueOf(this.input);
 	    				byte [] buf = str.getBytes();
-	    				File f = new File("/mnt/sdcard/sensor/"+this.senGyroscopemeter);
-	    				f.deleteOnExit();
-	    				if (!f.exists())
-	    					f.createNewFile();
-	    				FileOutputStream fos = new FileOutputStream(f);
-	    				fos.write(buf);
-	    				fos.flush();
-	    				fos.close();
+	    				gyrfos.write(buf);
+	    				gyrfos.flush();
 	    			}
 	    			catch(Exception e)
 	    			{
@@ -1569,20 +1734,14 @@ public class ServerActivity extends Activity {
     		{
     			this.light = event.values[0];
     			
-    			if (sensorRecordOn)
+    			if (isLogging)
     			{
     				try
 	    			{
 	    				String str = String.valueOf(this.light);
 	    				byte [] buf = str.getBytes();
-	    				File f = new File("/mnt/sdcard/sensor/"+this.senLightmeter);
-	    				f.deleteOnExit();
-	    				if (!f.exists())
-	    					f.createNewFile();
-	    				FileOutputStream fos = new FileOutputStream(f);
-	    				fos.write(buf);
-	    				fos.flush();
-	    				fos.close();
+	    				lightfos.write(buf);
+	    				lightfos.flush();
 	    			}
 	    			catch(Exception e)
 	    			{
@@ -1590,7 +1749,6 @@ public class ServerActivity extends Activity {
 	    				postMessage("[System Msg] Lightmeter Flush Failed.\n");
 	    			}
     			}
-    			
     			return;
     		}
     		if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD)
@@ -1599,20 +1757,15 @@ public class ServerActivity extends Activity {
     			this.magY = event.values[1];
     			this.magZ = event.values[2];
     			
-    			if (sensorRecordOn)
+    			if (isLogging)
     			{
     				try
 	    			{
-	    				String str = String.valueOf(this.magX) + ";" + String.valueOf(this.magY) + ";" + String.valueOf(this.magZ);
+    					Date d = new Date();
+	    				String str = d.toGMTString()+":"+String.valueOf(this.magX) + ";" + String.valueOf(this.magY) + ";" + String.valueOf(this.magZ);
 	    				byte [] buf = str.getBytes();
-	    				File f = new File("/mnt/sdcard/sensor/"+this.senMagnetometer);
-	    				f.deleteOnExit();
-	    				if (!f.exists())
-	    					f.createNewFile();
-	    				FileOutputStream fos = new FileOutputStream(f);
-	    				fos.write(buf);
-	    				fos.flush();
-	    				fos.close();
+	    				magfos.write(buf);
+	    				magfos.flush();
 	    			}
 	    			catch(Exception e)
 	    			{
@@ -1628,20 +1781,15 @@ public class ServerActivity extends Activity {
     			this.rotationY = event.values[1];
     			this.rotationZ = event.values[2];
     			
-    			if (sensorRecordOn)
+    			if (isLogging)
     			{	
     				try
 	    			{
-	    				String str = String.valueOf(this.rotationX) + ";" + String.valueOf(this.rotationY) + ";" + String.valueOf(this.rotationZ);
+    					Date d = new Date();
+	    				String str = d.toGMTString()+":"+String.valueOf(this.rotationX) + ";" + String.valueOf(this.rotationY) + ";" + String.valueOf(this.rotationZ);
 	    				byte [] buf = str.getBytes();
-	    				File f = new File("/mnt/sdcard/sensor/"+this.senOrientationmeter);
-	    				f.deleteOnExit();
-	    				if (!f.exists())
-	    					f.createNewFile();
-	    				FileOutputStream fos = new FileOutputStream(f);
-	    				fos.write(buf);
-	    				fos.flush();
-	    				fos.close();
+	    				orifos.write(buf);
+	    				orifos.flush();
 	    			}
 	    			catch(Exception e)
 	    			{
@@ -1655,20 +1803,15 @@ public class ServerActivity extends Activity {
     		{
     			this.proximity = event.values[0];
     			
-    			if (sensorRecordOn)
+    			if (isLogging)
     			{
 	    			try
 	    			{
-	    				String str = String.valueOf(this.proximity);
+	    				Date d = new Date();
+	    				String str = d.toGMTString()+":"+String.valueOf(this.proximity);
 	    				byte [] buf = str.getBytes();
-	    				File f = new File("/mnt/sdcard/sensor/"+this.senProximitymeter);
-	    				f.deleteOnExit();
-	    				if (!f.exists())
-	    					f.createNewFile();
-	    				FileOutputStream fos = new FileOutputStream(f);
-	    				fos.write(buf);
-	    				fos.flush();
-	    				fos.close();
+	    				proxfos.write(buf);
+	    				proxfos.flush();
 	    			}
 	    			catch(Exception e)
 	    			{
@@ -1685,20 +1828,15 @@ public class ServerActivity extends Activity {
     			this.gravityY = event.values[1];
     			this.gravityZ = event.values[2];
     			
-    			if (sensorRecordOn)
+    			if (isLogging)
     			{
 	    			try
 	    			{
-	    				String str = String.valueOf(this.gravityX) + ";" + String.valueOf(this.gravityY) + ";" + String.valueOf(this.gravityZ);
+	    				Date d = new Date();
+	    				String str = d.toGMTString()+":"+String.valueOf(this.gravityX) + ";" + String.valueOf(this.gravityY) + ";" + String.valueOf(this.gravityZ);
 	    				byte [] buf = str.getBytes();
-	    				File f = new File("/mnt/sdcard/sensor/"+this.senGravitymeter);
-	    				f.deleteOnExit();
-	    				if (!f.exists())
-	    					f.createNewFile();
-	    				FileOutputStream fos = new FileOutputStream(f);
-	    				fos.write(buf);
-	    				fos.flush();
-	    				fos.close();
+	    				gravfos.write(buf);
+	    				gravfos.flush();
 	    			}
 	    			catch(Exception e)
 	    			{
