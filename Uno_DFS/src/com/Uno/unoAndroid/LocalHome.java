@@ -48,7 +48,7 @@ public class LocalHome extends ListActivity {
 	private ProgressDialog pgDialog;
 	//private final static String UI_MESSAGE_ACTION = "com.UnoAndroid.UI_MSG_TO_SERVICE";
 	//private final static String SERVICE_MESSAGE_ACTION = "com.UnoAndroid.SERVICE_MSG_TO_UI";
-	private static String GOVERNOR_IP = "192.168.10.147";
+	private static String GOVERNOR_IP = "192.168.10.160";
 	/*private BroadcastReceiver mServiceBroadcastReceiver = new BroadcastReceiver () {
 
 		@Override
@@ -176,6 +176,7 @@ public class LocalHome extends ListActivity {
 		}
 		else if (keyword.equals("..")) {
 			pwd = pwd.getParentFile();
+			if (pwd == null) pwd = new File("/");
 			pwdString = pwd.getAbsolutePath();
 			
 			pwdChild.clear();

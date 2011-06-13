@@ -18,6 +18,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ListActivity;
 import android.content.DialogInterface;
+import android.content.DialogInterface.OnClickListener;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -31,13 +32,14 @@ public class UnoNetwork extends ListActivity {
 	private String NetworkPwd = "/";
 	private ArrayList <NetworkItem> NetworkPwdChild;
 	private ArrayList <String> NetworkPwdChildString;
-	private final String GOVERNOR_IP = "192.168.10.115";
+	private final String GOVERNOR_IP = "192.168.10.160";
 	private ArrayAdapter adapter;
 	private final PinDatabaseHelper pdbh = new PinDatabaseHelper(this);
 	
 	public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        NetworkPwdChildString = new ArrayList <String>();
         NetworkPwdChild = fetchPwdChildList(NetworkPwd);
         for (NetworkItem ni : NetworkPwdChild) {
         	String s = ni.ResourceName;
@@ -51,11 +53,14 @@ public class UnoNetwork extends ListActivity {
 	protected void onListItemClick(ListView l, View v, int position, long id) {
 		super.onListItemClick(l, v, position, id);
 		
+		final int pos = position;
 		final String keyword = this.getListAdapter().getItem(position).toString();
 		if (keyword.equals("..")) {
 			if (NetworkPwd.equals("/")) return;
-			NetworkPwd = NetworkPwd.substring(0, NetworkPwd.lastIndexOf("/")-1);
+			NetworkPwd = NetworkPwd.substring(0, NetworkPwd.lastIndexOf("/"));
+			if (NetworkPwd.equals("") || NetworkPwd == null) NetworkPwd = "/";
 			NetworkPwdChild = fetchPwdChildList(NetworkPwd);
+			NetworkPwdChildString.clear();
 			for (NetworkItem ni : NetworkPwdChild) {
 	        	String s = ni.ResourceName;
 	        	NetworkPwdChildString.add(s);
@@ -64,38 +69,59 @@ public class UnoNetwork extends ListActivity {
 		}
 		else if (keyword.endsWith("/")) {
 			/*
-			 * Two cases here: sensor directory and common directory.
-			 * Sensor file needs sensor ID.
+			 * Sensor/ has been considered in the server side. So we handle it like common file.
 			 * */
-			if (keyword.equals("Sensor/")) {
-				
-			}
-			else {
-				if (NetworkPwd.endsWith("/")) NetworkPwd += keyword.substring(0, keyword.length()-2);
-				else NetworkPwd += "/" + keyword.substring(0, keyword.length()-2);
-				NetworkPwdChild = fetchPwdChildList(NetworkPwd);
-				for (NetworkItem ni : NetworkPwdChild) {
-		        	String s = ni.ResourceName;
-		        	NetworkPwdChildString.add(s);
-		        }
-				adapter.notifyDataSetChanged();
-			}
+			if (NetworkPwd.endsWith("/")) NetworkPwd += keyword.substring(0, keyword.length()-1);
+			else NetworkPwd += "/" + keyword.substring(0, keyword.length()-1);
+			NetworkPwdChild = fetchPwdChildList(NetworkPwd);
+			NetworkPwdChildString.clear();
+			for (NetworkItem ni : NetworkPwdChild) {
+		       	String s = ni.ResourceName;
+		       	NetworkPwdChildString.add(s);
+		    }
+			adapter.notifyDataSetChanged();
+			
 		}
 		else {
 			/*
 			 * Two cases here: sensor file and common file
 			 * Sensor file use sensor ID.
 			 * */
-			if (NetworkPwd.endsWith("/Sensor")) {
+			if (NetworkPwd.endsWith("/Sensors")) {
 				
+				final String [] options = {"Sensor Instance", "Sensor Logging"};
+				AlertDialog.Builder optBuilder = new AlertDialog.Builder(this);
+				optBuilder.setTitle("Actions");
+				optBuilder.setSingleChoiceItems(options, -1, new DialogInterface.OnClickListener() {
+					
+					@Override
+					public void onClick(DialogInterface arg0, int arg1) {
+						arg0.dismiss();
+						if (arg1 == 0) {
+							showSensorInstance(pos);
+						}
+						else {
+							// TODO Logging sensor.
+						}
+						
+					}
+				});
+				optBuilder.setNegativeButton("Cancel", new OnClickListener() {
+
+					@Override
+					public void onClick(DialogInterface arg0, int arg1) {
+						arg0.dismiss();
+						
+					}});
+				optBuilder.create().show();
 			}
 			else {
-				final int pos = position;
 				final String [] options = {"File Metadata", "File Preview", "Thumbtack"};
 				AlertDialog.Builder optBuilder = new AlertDialog.Builder(this);
 				optBuilder.setTitle("Actions");
 				optBuilder.setSingleChoiceItems(options, -1, new DialogInterface.OnClickListener() {
 				    public void onClick(DialogInterface dialog, int item) {
+				    	dialog.dismiss();
 				    	if (item == 0) {
 				    		showNetworkFileMetadata(pos);
 				    	}
@@ -124,7 +150,7 @@ public class UnoNetwork extends ListActivity {
 		ArrayList <NetworkItem> pwdchild = new ArrayList <NetworkItem> ();
 		
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|DIR|"+pwd);
-        if (reply == null) return null;
+        
         NetworkItem p = new NetworkItem();
         
         // Add ".."
@@ -132,19 +158,28 @@ public class UnoNetwork extends ListActivity {
         p.ResourceGlobalId = "-1";
         pwdchild.add(p);
         
+        if (reply == null || reply.endsWith("NO_RESOURCE")) {
+        	Toast.makeText(getApplicationContext(), "No resource available now.", Toast.LENGTH_LONG).show();
+        	return pwdchild;
+        }
+        if (reply.endsWith("ACCESS_DENY")) {
+        	Toast.makeText(getApplicationContext(), "Access denied.", Toast.LENGTH_LONG).show();
+        	return pwdchild;
+        }
+        
         if (reply.startsWith("POST|DIR|")) {
         	String [] argv = reply.split("\\|");
         	String [] tlist = argv[2].split(";");
         	for (String s : tlist) {
         		NetworkItem ni = new NetworkItem();
-        		String [] t = s.split("^");
+        		String [] t = s.split("\\^");
         		ni.ResourceName = t[0];
         		ni.ResourceGlobalId = t[1]; // Global ID is -1 for directories.
         		pwdchild.add(ni);
         	}
         	return pwdchild;
         }
-        return null;
+        return pwdchild;
         
 	}
 	
@@ -172,13 +207,13 @@ public class UnoNetwork extends ListActivity {
 	
 	private void showNetworkFileMetadata(int pos) {
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|FILE|METADATA|"+ 
-				NetworkPwdChild.get(pos-1).ResourceName+"|"+NetworkPwdChild.get(pos-1).ResourceGlobalId);
+				NetworkPwdChild.get(pos).ResourceName+"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
 		if (reply == null) return;
 		if (reply.endsWith("NO_RESOURCE")) {
 			Toast.makeText(getApplicationContext(), "Metadata not availble now!", Toast.LENGTH_LONG).show();
 		}
 		else if (reply.startsWith("POST|FILE|METADATA")) {
-			String [] meta = reply.split("|")[3].split("%");
+			String [] meta = reply.split("\\|")[3].split("%");
 			final String [] attr = new String[5];
 			attr[0] = "File Size: "+meta[0]+" KB";
 			attr[1] = "Writable: "+(meta[1]=="w" ? "Yes":"No");
@@ -203,16 +238,16 @@ public class UnoNetwork extends ListActivity {
 	
 	private void pinNetworkFile(int pos) {
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|FILE|PIN|"+ 
-				NetworkPwdChild.get(pos-1).ResourceName+"|"+NetworkPwdChild.get(pos-1).ResourceGlobalId);
+				NetworkPwdChild.get(pos).ResourceName+"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
 		if (reply == null) return;
 		if (reply.endsWith("NO_RESOURCE")) {
 			Toast.makeText(getApplicationContext(), "Metadata not availble now!", Toast.LENGTH_LONG).show();
 		}
 		else if (reply.startsWith("POST|FILE")) {
 			String [] tmp = reply.split("\\|");
-			final String resIp = tmp[3];
-			final String path = tmp[4];
-			final String id = NetworkPwdChild.get(pos-1).ResourceGlobalId;
+			final String resIp = tmp[2];
+			final String path = tmp[3];
+			final String id = NetworkPwdChild.get(pos).ResourceGlobalId;
 			
 			/*
 			 * Use the following thread to retrieve file and update database.
@@ -224,7 +259,7 @@ public class UnoNetwork extends ListActivity {
 					try
 		        	{
 		        		InetAddress remote = InetAddress.getByName(resIp);
-		        		Socket s = new Socket(remote, 11316);
+		        		Socket s = new Socket(remote, 11314);
 		        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(s.getOutputStream())), true);
 		        		out.println("PIN|FILE|"+path);
 
@@ -260,6 +295,44 @@ public class UnoNetwork extends ListActivity {
 				}
 				
 			}.run();
+		}
+	}
+	
+	private void showSensorInstance(int pos) {
+		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|SENSOR|"+NetworkPwdChild.get(pos).ResourceName+
+				"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
+		if (reply == null) return;
+		if (reply.startsWith("POST|SENSOR|")) {
+			/*
+			 * First go to target mobile device to get sensor values.
+			 * */
+			String response = sendTcpPacket(reply.split("\\|")[2], 11314, "GET|SENSOR|"+NetworkPwdChild.get(pos).ResourceName);
+			if (response == null) return;
+			
+			if (response.startsWith("POST|SENSOR|")) {
+				String [] tmp = response.split("\\|")[2].split("%");
+				String [] val = new String[3];
+				val[0] = "X: "+tmp[0];
+				val[1] = "Y: "+tmp[1];
+				val[2] = "Z: "+tmp[2];
+				AlertDialog.Builder sensorInsBuilder = new AlertDialog.Builder(this);
+				sensorInsBuilder.setTitle("Sensor Instant Values");
+				sensorInsBuilder.setItems(val, new OnClickListener () {
+	
+					@Override
+					public void onClick(DialogInterface arg0, int arg1) {
+						// TODO Auto-generated method stub
+						
+					}});
+				sensorInsBuilder.setNegativeButton("OK", new OnClickListener () {
+	
+					@Override
+					public void onClick(DialogInterface arg0, int arg1) {
+						arg0.dismiss();
+						
+					}});
+				sensorInsBuilder.create().show();
+			}
 		}
 	}
 }

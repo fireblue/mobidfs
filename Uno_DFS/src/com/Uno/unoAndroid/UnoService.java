@@ -4,6 +4,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -60,8 +61,8 @@ public class UnoService extends Service {
 	public void onCreate() {
 		mComSensorMgr = new CommonSensorManager();
 		tcplist = new TCPListenThread(this);
-		udplist = new UDPListenThread();
-		sfclist = new SocketFileListenThread();
+		//udplist = new UDPListenThread();
+		//sfclist = new SocketFileListenThread();
 		mSoundMgr = new SoundMeterManager();
 		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 		//mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -79,7 +80,7 @@ public class UnoService extends Service {
 		mSoundMgr.startMeasure();
 		
 		broadcastIntent = new Intent(UnoService.this, UnoService.class);
-		
+		setupSensorsPipeFile();
 	}
 	
 	@Override
@@ -123,7 +124,7 @@ public class UnoService extends Service {
 	 * */
 
 	private final Context mCtx = this;
-	private static String GOVERNOR_IP = "192.168.10.147";
+	private static String GOVERNOR_IP = "192.168.10.160";
 	private static String DEVICE_LOCAL_LISTEN_IP = null;
 	private ServerSocket tcpServer = null;
 	private TCPListenThread tcplist = null;
@@ -231,7 +232,76 @@ public class UnoService extends Service {
 					catch (Exception e) {}
 				}
 			}
+			else if (argv[0].equals("GET")) {
+				if (argv[1].equals("SENSOR")) {
+					String sensor = argv[2];
+					String [] res = readSensorValues(sensor);
+					try {
+						String outgoingMsg = "POST|SENSOR|"+res[0]+"%"+res[1]+"%"+res[2];
+						byte [] buf = outgoingMsg.getBytes();
+						DataOutputStream out = new DataOutputStream(client.getOutputStream());
+						out.write(buf);
+						
+						client.close();
+						out.close();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+					
+				}
+			}
 		}
+	}
+	
+	private String [] readSensorValues (String type) {
+		String [] val = new String[4];
+		if (type.equals("TYPE_ACCELEROMETER")) {
+			val[0] = String.valueOf(mComSensorMgr.accX);
+			val[1] = String.valueOf(mComSensorMgr.accY);
+			val[2] = String.valueOf(mComSensorMgr.accZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_GRAVITY")) {
+			val[0] = String.valueOf(mComSensorMgr.gravityX);
+			val[1] = String.valueOf(mComSensorMgr.gravityY);
+			val[2] = String.valueOf(mComSensorMgr.gravityZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_GYROSCOPE")) {
+			val[0] = String.valueOf(mComSensorMgr.spin);
+			val[1] = String.valueOf(mComSensorMgr.output);
+			val[2] = String.valueOf(mComSensorMgr.input);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_LIGHT")) {
+			val[0] = String.valueOf(mComSensorMgr.light);
+			val[1] = val[2] = val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_MAGNETIC_FIELD")) {
+			val[0] = String.valueOf(mComSensorMgr.magX);
+			val[1] = String.valueOf(mComSensorMgr.magY);
+			val[2] = String.valueOf(mComSensorMgr.magZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_ORIENTATION")) {
+			val[0] = String.valueOf(mComSensorMgr.rotationX);
+			val[1] = String.valueOf(mComSensorMgr.rotationY);
+			val[2] = String.valueOf(mComSensorMgr.rotationZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_PROXIMITY")) {
+			val[0] = String.valueOf(mComSensorMgr.proximity);
+			val[1] = val[2] = val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_SOUNDMETER")) {
+			val[0] = String.valueOf(UnoService.soundPressureValue);
+			val[1] = val[2] = val[3] = "N/A";
+		}
+		else if (type.equals("LOCATION")) {
+			val[0] = val[1] = val[2] = val[3] = "N/A";
+		}
+		
+		return val;
 	}
 	
 	private class TCPListenThread extends Thread {
@@ -255,7 +325,7 @@ public class UnoService extends Service {
     						BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
     						String line = "";
     						String incomingMsg = "";
-    						while ((line = in.readLine()) != null) incomingMsg += line;
+    						incomingMsg = in.readLine();
 
     						NetworkMessageParser(mCtx, incomingMsg, client);
 						
@@ -929,4 +999,45 @@ public class UnoService extends Service {
     	return metadata;
 	}
 	
+	
+    private void setupSensorsPipeFile() {
+    	File f = new File("/mnt/sdcard/Sensors/TYPE_ACCELEROMETER");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_GRAVITY");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_GYROSCOPE");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_LIGHT");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_LINEAR_ACCELERATION");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_MAGNETIC_FIELD");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_ORIENTATION");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_PRESSURE");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_PROXIMITY");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_ROTATION_VECTOR");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_TEMPERATURE");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_SOUNDMETER");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/LOCATION");
+    	if (!f.exists()) f.mkdirs();
+    }
 }

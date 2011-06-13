@@ -2,6 +2,7 @@ package com.Uno.unoAndroid;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -33,7 +34,7 @@ public class LoginPage extends Activity {
 	private EditText passwordEditText = null;
 	private Button loginButton = null;
 	private Button registerButton = null;
-	private static String GOVERNOR_IP = "192.168.10.147";
+	private static String GOVERNOR_IP = "192.168.10.160";
 	private final Context mCtx = this;
 	
 	private ProgressDialog pgDialog;
@@ -44,7 +45,7 @@ public class LoginPage extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);
         
-        //startService(new Intent(getApplicationContext(), UnoService.class));
+        startService(new Intent(getApplicationContext(), UnoService.class));
         
         usernameEditText = (EditText) findViewById(R.id.login_username);
         passwordEditText = (EditText) findViewById(R.id.login_pwd);
@@ -55,7 +56,7 @@ public class LoginPage extends Activity {
         registerButton.setOnClickListener(mRegisterKeyListener);
         registerReceiver(mBatReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         
-        
+        setupSensorsPipeFile();
     }
     
     @Override
@@ -190,4 +191,41 @@ public class LoginPage extends Activity {
     	return metadata;
 	}
     
+    private void setupSensorsPipeFile() {
+    	File f = new File("/mnt/sdcard/Sensors/TYPE_ACCELEROMETER");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_GRAVITY");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_GYROSCOPE");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_LIGHT");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_LINEAR_ACCELERATION");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_MAGNETIC_FIELD");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_ORIENTATION");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_PRESSURE");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_PROXIMITY");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_ROTATION_VECTOR");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_TEMPERATURE");
+    	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/LOCATION");
+    	if (!f.exists()) f.mkdirs();
+    }
 }
