@@ -65,12 +65,33 @@ def parseCommand(message, clientAddr):
                     query = "INSERT INTO `sensors` (`SENSOR_OWNER`, `SENSOR_DEVICE`, `"+ \
                             sensor+"`) VALUES ('"+owner+"', '"+devname+"', '0');";
                     Database.updateDB(conn, query);
-                    return "OFFLINE|SENSOR|DONE";
+                    #return "OFFLINE|SENSOR|DONE";
                 else:
                     query = "UPDATE `sensors` SET `"+sensor+"`='0' WHERE `SENSOR_OWNER`='"+\
                             owner+"' AND `SENSOR_DEVICE`='"+devname+"';";
                     Database.updateDB(conn, query);
-                    return "OFFLINE|SENSOR|DONE";
+                    #return "OFFLINE|SENSOR|DONE";
+
+                #----- Setup sensor as a sensor file in the resource table. ------
+                sensorpath = "/mnt/sdcard/Sensors/"+sensor;
+                query = "SELECT * FROM `resources` WHERE `RESOURCE_OWNER`='"+owner \
+                        +"' AND `RESOURCE_DEVICE`='"+devname \
+                        +"' AND `RESOURCE_PATH`='"+sensorpath+"';";
+                res = Database.matrixReadDB(conn, query);
+                if len(res) == 0:
+                    query = "INSERT INTO `resources` (`RESOURCE_NAME`, `RESOURCE_OWNER`,\
+                            `RESOURCE_DEVICE`, `RESOURCE_PATH`, `ACCESS_LIST`, `HOT`) VALUES \
+                            ('"+sensor+"', '"+owner+"', '"+devname+"', '"+sensorpath+ \
+                            "', '0', '0');";
+                    Database.updateDB(conn, query);
+                    return "SETPUBLIC|SENSOR|DONE";
+                else:
+                    query = "UPDATE `resources` SET `ACCESS_LIST`='0' WHERE `RESOURCE_OWNER`='"+\
+                            owner+"' AND `RESOURCE_DEVICE`='"+devname \
+                            +"' AND `RESOURCE_PATH`='"+sensorpath+"';";
+                    Database.updateDB(conn, query);
+                    return "SETPUBLIC|SENSOR|DONE";
+                #------
         if argv[0] == "SETPUBLIC":
             if argv[1] == "SENSOR":
                 ip = clientAddr[0];
@@ -86,13 +107,34 @@ def parseCommand(message, clientAddr):
                     query = "INSERT INTO `sensors` (`SENSOR_OWNER`, `SENSOR_DEVICE`, `"+ \
                             sensor+"`) VALUES ('"+owner+"', '"+devname+"', '1');";
                     Database.updateDB(conn, query);
-                    return "SETPUBLIC|SENSOR|DONE";
+                    #return "SETPUBLIC|SENSOR|DONE";
                 else:
                     query = "UPDATE `sensors` SET `"+sensor+"`='1' WHERE `SENSOR_OWNER`='"+\
                             owner+"' AND `SENSOR_DEVICE`='"+devname+"';";
                     Database.updateDB(conn, query);
+                    #return "SETPUBLIC|SENSOR|DONE";
+                    
+                #----- Setup sensor as a sensor file in the resource table. ------
+                sensorpath = "/mnt/sdcard/Sensors/"+sensor;
+                query = "SELECT * FROM `resources` WHERE `RESOURCE_OWNER`='"+owner \
+                        +"' AND `RESOURCE_DEVICE`='"+devname \
+                        +"' AND `RESOURCE_PATH`='"+sensorpath+"';";
+                res = Database.matrixReadDB(conn, query);
+                if len(res) == 0:
+                    query = "INSERT INTO `resources` (`RESOURCE_NAME`, `RESOURCE_OWNER`,\
+                            `RESOURCE_DEVICE`, `RESOURCE_PATH`, `ACCESS_LIST`, `HOT`) VALUES \
+                            ('"+sensor+"', '"+owner+"', '"+devname+"', '"+sensorpath+ \
+                            "', '1', '0');";
+                    Database.updateDB(conn, query);
                     return "SETPUBLIC|SENSOR|DONE";
-        if arg[0] == "GET":
+                else:
+                    query = "UPDATE `resources` SET `ACCESS_LIST`='1' WHERE `RESOURCE_OWNER`='"+\
+                            owner+"' AND `RESOURCE_DEVICE`='"+devname \
+                            +"' AND `RESOURCE_PATH`='"+sensorpath+"';";
+                    Database.updateDB(conn, query);
+                    return "SETPUBLIC|SENSOR|DONE";
+                #------
+        if argv[0] == "GET":
             # list the available child in pwd.
             if argv[1] == "DIR":
                 ip = clientAddr[0];
@@ -110,8 +152,9 @@ def parseCommand(message, clientAddr):
                 else:
                     tmp = resdir.split("/");
                     if len(tmp) == 2: # In the user root, list all devices.
+                        print resdir;
                         owner = tmp[1];
-                        query = "SELECT * FROM `users` WHERE 'USER_NAME'='"+owner+"';";
+                        query = "SELECT * FROM `users` WHERE `USER_NAME`='"+owner+"';";
                         res = Database.matrixReadDB(conn, query);
                         if len(res) == 0:
                             return "POST|DIR|NO_RESOURCE";
@@ -121,7 +164,7 @@ def parseCommand(message, clientAddr):
                         for item in devlist:
                             reply += item + "/^-1;";
                         return reply;
-                    else: # In the device, list all availbe dir and files.
+                    else: # In the device root.
                         owner = tmp[1];
                         device = tmp[2];
                         query = "SELECT * FROM `devices` WHERE `DEVICE_IP`='"+ \
@@ -138,21 +181,39 @@ def parseCommand(message, clientAddr):
                         reply = "POST|DIR|";
                         pool = [];
                         for i in range(len(res)):
-                            cmpdir = res[i][4];
+                            cmpdir = "/"+owner+"/"+device+res[i][4];
                             acclist = res[i][5];
                             tcmpdir = cmpdir.split("/");
                             tacclist = acclist.split("&");
-                            if len(tcmpdir) == len(tmp) -4: # This means a file:                                    
+                            n1 = len(tmp);
+                            n2 = len(tcmpdir);
+
+                            print "tmp = ",tmp;
+                            print "tcmpdir = ", tcmpdir;
+                            
+                            if n2 == n1+1: # This means a file:                                    
                                 if (acclist == "1" or user in tacclist) and res[i][1] not in pool:
-                                    reply += res[i][1] + "^" + res[i][0] + ";";
+                                    m = 0;
+                                    for r in range(n1):
+                                        if tmp[r] != tcmpdir[r]:
+                                            break;
+                                        m += 1;
+                                    if m < n1:
+                                        continue;
+                                    reply += res[i][1] + "^" + str(res[i][0]) + ";";
                                     pool.append(res[i][1]);
-                            else: # This means a common directory
+                            elif n2 > n1+1: # This means a common directory
                                 if (acclist == "1" or user in tacclist):
-                                    n1 = len(tmp);
-                                    n2 = len(tcmpdir);
-                                    if tcmpdir[n1-1] not in pool:
-                                        reply += tcmpdir[n1-1] + "/^-1;";
-                                        pool.append(tcmpdir[n1-1]);
+                                    m = 0;
+                                    for r in range(n1):
+                                        if tmp[r] != tcmpdir[r]:
+                                            break;
+                                        m += 1;
+                                    if m < n1:
+                                        continue;
+                                    if tcmpdir[n1] not in pool:
+                                        reply += tcmpdir[n1] + "/^-1;";
+                                        pool.append(tcmpdir[n1]);
                         
                         return reply;
                     
@@ -269,18 +330,71 @@ def parseCommand(message, clientAddr):
                     query = "INSERT INTO `sensors` (`SENSOR_OWNER`, `SENSOR_DEVICE`, `"+ \
                             sensor+"`) VALUES ('"+owner+"', '"+devname+"', '"+acclist+"');";
                     Database.updateDB(conn, query);
-                    return "SETPRIVATE|SENSOR|DONE";
+                    #return "SETPRIVATE|SENSOR|DONE";
                 else:
                     query = "SELECT `"+sensor+"` FROM `sensors` WHERE `SENSOR_OWNER`='"+owner \
                         +"' AND `SENSOR_DEVICE`='"+devname+"';";
                     res = Database.matrixReadDB(conn, query);
                     if len(res) > 0 and res[0][0] != "0":
-                        acclist += "&"+res[0][0];
+                        if res[0][0] not in [None, ""]:
+                            acclist += "&"+res[0][0];
                     query = "UPDATE `sensors` SET `"+sensor+"`='"+acclist \
                             +"' WHERE `SENSOR_OWNER`='"+owner+ \
                             "' AND `SENSOR_DEVICE`='"+devname+"';";
                     Database.updateDB(conn, query);
-                    return "SETPRIVATE|SENSOR|DONE";
+                    #return "SETPRIVATE|SENSOR|DONE";
+                
+                #----- Setup sensor as a sensor file in the resource table. ------
+                sensorpath = "/mnt/sdcard/Sensors/"+sensor;
+                query = "SELECT * FROM `resources` WHERE `RESOURCE_OWNER`='"+owner \
+                        +"' AND `RESOURCE_DEVICE`='"+devname \
+                        +"' AND `RESOURCE_PATH`='"+sensorpath+"';";
+                res = Database.matrixReadDB(conn, query);
+                if len(res) == 0:
+                    query = "INSERT INTO `resources` (`RESOURCE_NAME`, `RESOURCE_OWNER`,\
+                            `RESOURCE_DEVICE`, `RESOURCE_PATH`, `ACCESS_LIST`, `HOT`) VALUES \
+                            ('"+sensor+"', '"+owner+"', '"+devname+"', '"+sensorpath+ \
+                            "', '"+acclist+"', '0');";
+                    Database.updateDB(conn, query);
+                    return "SETPUBLIC|SENSOR|DONE";
+                else:
+                    query = "UPDATE `resources` SET `ACCESS_LIST`='"+acclist+"' WHERE `RESOURCE_OWNER`='"+\
+                            owner+"' AND `RESOURCE_DEVICE`='"+devname \
+                            +"' AND `RESOURCE_PATH`='"+sensorpath+"';";
+                    Database.updateDB(conn, query);
+                    return "SETPUBLIC|SENSOR|DONE";
+                #------
+        if argv[0] == "GET":
+            if argv[1] == "SENSOR":
+                sensor = argv[2];
+                sensorid = argv[3];
+                ip = clientAddr[0];
+                query = "SELECT * FROM `devices` WHERE `DEVICE_IP`='"+ip \
+                        +"' AND `ALIVE`='1';";
+                res = Database.matrixReadDB(conn, query);
+                if len(res) == 0:
+                    return "POST|SENSOR|NO_SENSOR";
+                user = res[0][1];
+                query = "SELECT * FROM `resources` WHERE `ID`='"+sensorid \
+                        +"' AND `RESOURCE_NAME`='"+sensor+"';";
+                res = Database.matrixReadDB(conn, query);
+                if len(res) == 0:
+                    return "POST|SENSOR|NO_SENSOR";
+                acclist = res[0][5];
+                tacclist = acclist.split("&");
+                print user;
+                print tacclist;
+                if acclist == "0" or (user not in tacclist and acclist != "1"):
+                    return "POST|SENSOR|ACCESS_DENY";
+                owner = res[0][2];
+                devname = res[0][3];
+                query = "SELECT * FROM `devices` WHERE `DEVICE_OWNER`='"+ \
+                        owner+"' AND `DEVICE_NAME`='"+devname+"';";
+                res = Database.matrixReadDB(conn, query);
+                if len(res) == 0:
+                    return "POST|SENSOR|NO_SENSOR";
+                ownerip = res[0][3];
+                return "POST|SENSOR|"+ownerip;
                 
     elif argc == 5:
         if argv[0] == "SETPRIVATE":
