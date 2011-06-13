@@ -30,7 +30,7 @@ public class RegisterPage extends Activity {
 	private EditText passwordEditText = null;
 	private EditText confirmEditText = null;
 	private Button registerButton = null;
-	private static String GOVERNOR_IP = "192.168.10.147";
+	private static String GOVERNOR_IP = "192.168.10.160";
 	private ProgressDialog pgDialog;
 	
     /** Called when the activity is first created. */
