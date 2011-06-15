@@ -50,7 +50,6 @@ public class RegisterPage extends Activity {
     
     private OnClickListener mRegisterKeyListener = new OnClickListener() {
 
-		@Override
 		public void onClick(View arg0) {		
 			RegisterProcess();
 		}

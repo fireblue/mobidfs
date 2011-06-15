@@ -315,7 +315,7 @@ public class LocalHome extends ListActivity {
 		
 		btOk.setOnClickListener(new OnClickListener () {
 
-			@Override
+			//@Override
 			public void onClick(View arg0) {
 				accAlert.dismiss();
 				
@@ -337,7 +337,7 @@ public class LocalHome extends ListActivity {
 			}});
 		btCancel.setOnClickListener(new OnClickListener () {
 
-			@Override
+			//@Override
 			public void onClick(View arg0) {
 				pgDialog.dismiss();
 				accAlert.dismiss();

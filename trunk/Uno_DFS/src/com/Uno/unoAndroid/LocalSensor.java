@@ -127,7 +127,6 @@ public class LocalSensor extends ListActivity {
 		
 		btOk.setOnClickListener(new OnClickListener () {
 
-			@Override
 			public void onClick(View arg0) {
 				accAlert.dismiss();
 				
@@ -139,7 +138,6 @@ public class LocalSensor extends ListActivity {
 			}});
 		btCancel.setOnClickListener(new OnClickListener () {
 
-			@Override
 			public void onClick(View arg0) {
 				pgDialog.dismiss();
 				accAlert.dismiss();
@@ -284,22 +282,18 @@ public class LocalSensor extends ListActivity {
 			this.listSensorValues = sv;
 		}
 		
-		@Override
 		public int getCount() {
 			return listSensorValues.size();
 		}
 
-		@Override
 		public Object getItem(int arg0) {
 			return listSensorValues.get(arg0);
 		}
 
-		@Override
 		public long getItemId(int arg0) {
 			return arg0;
 		}
 
-		@Override
 		public View getView(int pos, View v, ViewGroup vg) {
 			
 			SensorValues entry = listSensorValues.get(pos);
@@ -368,8 +362,7 @@ public class LocalSensor extends ListActivity {
     		mSensorManager.unregisterListener(this, this.Gravitymeter);
     	}
     	
-    	@Override
-        public void onSensorChanged(SensorEvent event) {
+    	public void onSensorChanged(SensorEvent event) {
     		
     		delay++;
     		if (delay != 10) return;
@@ -454,8 +447,7 @@ public class LocalSensor extends ListActivity {
     		adapter.notifyDataSetChanged();
     	}
     	
-    	@Override
-        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+    	public void onAccuracyChanged(Sensor sensor, int accuracy) {
         
     	}
     }
