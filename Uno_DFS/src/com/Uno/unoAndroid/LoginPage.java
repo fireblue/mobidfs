@@ -34,7 +34,7 @@ public class LoginPage extends Activity {
 	private EditText passwordEditText = null;
 	private Button loginButton = null;
 	private Button registerButton = null;
-	private static String GOVERNOR_IP = "192.168.10.160";
+	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
 	private final Context mCtx = this;
 	
 	private ProgressDialog pgDialog;

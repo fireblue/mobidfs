@@ -124,7 +124,7 @@ public class UnoService extends Service {
 	 * */
 
 	private final Context mCtx = this;
-	private static String GOVERNOR_IP = "192.168.10.160";
+	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
 	private static String DEVICE_LOCAL_LISTEN_IP = null;
 	private ServerSocket tcpServer = null;
 	private TCPListenThread tcplist = null;

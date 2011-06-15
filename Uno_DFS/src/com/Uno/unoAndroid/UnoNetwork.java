@@ -32,7 +32,7 @@ public class UnoNetwork extends ListActivity {
 	private String NetworkPwd = "/";
 	private ArrayList <NetworkItem> NetworkPwdChild;
 	private ArrayList <String> NetworkPwdChildString;
-	private final String GOVERNOR_IP = "192.168.10.160";
+	private final String GOVERNOR_IP = "com1379.eecs.utk.edu";
 	private ArrayAdapter adapter;
 	private final PinDatabaseHelper pdbh = new PinDatabaseHelper(this);
 	
