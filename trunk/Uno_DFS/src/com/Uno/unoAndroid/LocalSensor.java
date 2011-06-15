@@ -141,7 +141,9 @@ public class LocalSensor extends ListActivity {
 
 			@Override
 			public void onClick(View arg0) {
+				pgDialog.dismiss();
 				accAlert.dismiss();
+				
 			}});
 	}
 	
