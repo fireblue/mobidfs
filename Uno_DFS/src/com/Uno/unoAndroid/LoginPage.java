@@ -80,7 +80,6 @@ public class LoginPage extends Activity {
     
     private OnClickListener mLoginKeyListener = new OnClickListener() {
 
-		@Override
 		public void onClick(View arg0) {
 			pgDialog = ProgressDialog.show(LoginPage.this, "", "Login, please wait...", true);
 			pgDialog.show();
@@ -91,7 +90,6 @@ public class LoginPage extends Activity {
     
     private OnClickListener mRegisterKeyListener = new OnClickListener() {
 
-		@Override
 		public void onClick(View arg0) {
 			startActivity(new Intent(LoginPage.this, RegisterPage.class));
 			

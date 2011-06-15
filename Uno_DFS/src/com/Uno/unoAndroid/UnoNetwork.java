@@ -94,7 +94,6 @@ public class UnoNetwork extends ListActivity {
 				optBuilder.setTitle("Actions");
 				optBuilder.setSingleChoiceItems(options, -1, new DialogInterface.OnClickListener() {
 					
-					@Override
 					public void onClick(DialogInterface arg0, int arg1) {
 						arg0.dismiss();
 						if (arg1 == 0) {
@@ -108,7 +107,6 @@ public class UnoNetwork extends ListActivity {
 				});
 				optBuilder.setNegativeButton("Cancel", new OnClickListener() {
 
-					@Override
 					public void onClick(DialogInterface arg0, int arg1) {
 						arg0.dismiss();
 						
@@ -254,7 +252,6 @@ public class UnoNetwork extends ListActivity {
 			 * */ 
 			new Runnable () {
 
-				@Override
 				public void run() {
 					try
 		        	{
@@ -319,14 +316,12 @@ public class UnoNetwork extends ListActivity {
 				sensorInsBuilder.setTitle("Sensor Instant Values");
 				sensorInsBuilder.setItems(val, new OnClickListener () {
 	
-					@Override
 					public void onClick(DialogInterface arg0, int arg1) {
 						// TODO Auto-generated method stub
 						
 					}});
 				sensorInsBuilder.setNegativeButton("OK", new OnClickListener () {
 	
-					@Override
 					public void onClick(DialogInterface arg0, int arg1) {
 						arg0.dismiss();
 						

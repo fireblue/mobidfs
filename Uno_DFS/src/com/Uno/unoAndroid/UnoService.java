@@ -596,8 +596,7 @@ public class UnoService extends Service {
     		
     	}
     	
-    	@Override
-        public void onSensorChanged(SensorEvent event) {
+    	public void onSensorChanged(SensorEvent event) {
     		
     		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
     			this.accX = event.values[0];
@@ -740,8 +739,7 @@ public class UnoService extends Service {
     		}
     	}
     	
-    	@Override
-        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+    	public void onAccuracyChanged(Sensor sensor, int accuracy) {
         
     	}
     }
