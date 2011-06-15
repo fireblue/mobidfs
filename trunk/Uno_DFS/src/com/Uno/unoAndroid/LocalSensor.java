@@ -45,7 +45,7 @@ import android.widget.Toast;
 
 public class LocalSensor extends ListActivity {
 	
-	private static String GOVERNOR_IP = "192.168.10.160";
+	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
 	private List <SensorValues> valuelist;
 	private SensorAdapter adapter;
 	private ProgressDialog pgDialog;
