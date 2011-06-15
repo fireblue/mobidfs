@@ -188,8 +188,8 @@ def parseCommand(message, clientAddr):
                             n1 = len(tmp);
                             n2 = len(tcmpdir);
 
-                            print "tmp = ",tmp;
-                            print "tcmpdir = ", tcmpdir;
+                            #print "tmp = ",tmp;
+                            #print "tcmpdir = ", tcmpdir;
                             
                             if n2 == n1+1: # This means a file:                                    
                                 if (acclist == "1" or user in tacclist) and res[i][1] not in pool:

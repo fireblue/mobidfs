@@ -1,5 +1,5 @@
-TCP_HOST = ("192.168.10.160", 11314);
-UDP_HOST = ("192.168.10.160", 11315);
-FTP_HOST = ("192.168.10.160", 11316);
+TCP_HOST = ("com1379.eecs.utk.edu", 11314);
+UDP_HOST = ("com1379.eecs.utk.edu", 11315);
+FTP_HOST = ("com1379.eecs.utk.edu", 11316);
 
 CommandSet = ["LOGIN", "SETPUBLIC", "SETPRIVATE", "OFFLINE", "REGISTER", "GET"];
