@@ -62,6 +62,14 @@ public class RegisterPage extends Activity {
 		String pwd = passwordEditText.getText().toString();
 		String cfm = confirmEditText.getText().toString();
     	
+		if (usr.equals("") || pwd.equals("") || cfm.equals("")) {
+			Toast.makeText(getApplicationContext(), "Missing Important Information...", Toast.LENGTH_LONG).show();
+			Vibrator vbr = (Vibrator)getSystemService(Context.VIBRATOR_SERVICE);
+			vbr.vibrate(300);
+			//pgDialog.dismiss();
+			return;
+		}
+		
     	if (!cfm.equals(pwd)) {
 			Toast.makeText(getApplicationContext(), "Password not the same, please check it.", Toast.LENGTH_LONG).show();
 			

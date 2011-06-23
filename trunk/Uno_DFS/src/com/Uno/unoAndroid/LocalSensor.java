@@ -71,6 +71,12 @@ public class LocalSensor extends ListActivity {
 	}
 	
 	@Override
+	public void onResume() {
+		super.onResume();
+		mComSensorMgr.startSensor();
+	}
+	
+	@Override
 	protected void onListItemClick(ListView l, View v, int position, long id) {
 		super.onListItemClick(l, v, position, id);
 		

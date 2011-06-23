@@ -21,6 +21,7 @@ import android.content.IntentFilter;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -101,6 +102,14 @@ public class LoginPage extends Activity {
     {
 		String usr = usernameEditText.getText().toString();
 		String pwd = passwordEditText.getText().toString();
+		
+		if (usr.equals("") || pwd.equals("")) {
+			Toast.makeText(getApplicationContext(), "Missing Important Information...", Toast.LENGTH_LONG).show();
+			Vibrator vbr = (Vibrator)getSystemService(Context.VIBRATOR_SERVICE);
+			vbr.vibrate(300);
+			pgDialog.dismiss();
+			return;
+		}
 		
 		String loginMsg = "LOGIN|"+usr+"|"+pwd+"|"+getDeviceMetadata();
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, loginMsg);
