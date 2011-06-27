@@ -33,7 +33,7 @@ public class UnoNetwork extends ListActivity {
 	private ArrayList <NetworkItem> NetworkPwdChild;
 	private ArrayList <String> NetworkPwdChildString;
 	private final String GOVERNOR_IP = "com1379.eecs.utk.edu";
-	private ArrayAdapter adapter;
+	private ArrayAdapter <String> adapter;
 	private final PinDatabaseHelper pdbh = new PinDatabaseHelper(this);
 	
 	public void onCreate(Bundle savedInstanceState) {
