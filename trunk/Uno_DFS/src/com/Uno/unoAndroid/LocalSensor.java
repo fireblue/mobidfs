@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -263,7 +264,10 @@ public class LocalSensor extends ListActivity {
 		
 		entry = new SensorValues();
 		entry.SensorName = "Location";
-		entry.valueX = entry.valueY = entry.valueZ = entry.Accuracy = "0";
+		entry.valueX = String.valueOf(UnoService.passiveLatitude);
+		entry.valueY = String.valueOf(UnoService.passiveLongitude);
+		entry.valueZ = String.valueOf(UnoService.passiveAltitude);
+		entry.Accuracy = String.valueOf(UnoService.passiveAccuracy);
 		list.add(entry);
 		SENSOR_NAME_MAP.put(entry.SensorName, "LOCATION");
 		
@@ -371,15 +375,15 @@ public class LocalSensor extends ListActivity {
     	public void onSensorChanged(SensorEvent event) {
     		
     		delay++;
-    		if (delay != 10) return;
+    		if (delay != 20) return;
     		delay = 0;
     		
     		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
     			SensorValues entry = new SensorValues();
     			entry.SensorName = "Accelerometer";
-    			entry.valueX = String.valueOf(event.values[0]);
-    			entry.valueY = String.valueOf(event.values[1]);
-    			entry.valueZ = String.valueOf(event.values[2]);
+    			entry.valueX = String.valueOf(-event.values[0]+Double.valueOf(valuelist.get(6).valueX));
+    			entry.valueY = String.valueOf(-event.values[1]+Double.valueOf(valuelist.get(6).valueY));
+    			entry.valueZ = String.valueOf(-event.values[2]+Double.valueOf(valuelist.get(6).valueZ));
     			entry.Accuracy = "0";
     			valuelist.set(0, entry);
     		}
@@ -449,7 +453,15 @@ public class LocalSensor extends ListActivity {
 	   		entry.valueX = String.valueOf(UnoService.soundPressureValue);
 	   		entry.valueY = entry.valueZ = "N/A";
 	   		entry.Accuracy = "0";
-    		valuelist.set(7, entry);    		
+    		valuelist.set(7, entry);  
+    		
+    		entry = new SensorValues();
+    		entry.SensorName = "Location";
+    		entry.valueX = String.valueOf(UnoService.passiveLatitude);
+    		entry.valueY = String.valueOf(UnoService.passiveLongitude);
+    		entry.valueZ = String.valueOf(UnoService.passiveAccuracy);
+    		entry.Accuracy = String.valueOf(UnoService.passiveAccuracy);
+    		valuelist.set(8, entry);
     		adapter.notifyDataSetChanged();
     	}
     	

@@ -36,13 +36,17 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Criteria;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -52,45 +56,40 @@ import android.widget.Toast;
 
 public class UnoService extends Service {
 
-	NotificationManager mNM = null;
-	ArrayList <Messenger> mClients = new ArrayList <Messenger>();
 	int mValue = 0;
 	public static double soundPressureValue = 0;
+	public static double passiveLatitude = 0;
+	public static double passiveLongitude = 0;
+	public static double passiveAltitude = 0;
+	public static double passiveAccuracy = 0;
 	
 	@Override
 	public void onCreate() {
 		mComSensorMgr = new CommonSensorManager();
 		tcplist = new TCPListenThread(this);
-		//udplist = new UDPListenThread();
-		//sfclist = new SocketFileListenThread();
+		
 		mSoundMgr = new SoundMeterManager();
-		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-		//mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
-		//Intent intent = new Intent(locAction);
-		//PendingIntent pi = PendingIntent.getBroadcast(this, resultCode, intent, LocationFlags);
-		//mLocationMgr.requestLocationUpdates(passiveProvider, 200, 10, pi);
-		//registerReceiver(mLocationReceiver, new IntentFilter(locAction));
+		
+		startFineLocationService();
+
 		registerReceiver(mBatReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-		registerReceiver(mUiMessageReceiver, new IntentFilter(UI_MESSAGE_ACTION));
 		
 		tcplist.start();
-		//udplist.start();
-		//sfclist.start();
+
 		mComSensorMgr.startSensor();
 		mSoundMgr.startMeasure();
 		
-		broadcastIntent = new Intent(UnoService.this, UnoService.class);
-		setupSensorsPipeFile();
+		setupSensorsObjectFile();
 	}
 	
 	@Override
 	public void onDestroy() {
 		unregisterReceiver(mBatReceiver);
 		tcplist.stop();
-		//udplist.stop();
-		//sfclist.stop();
+
 		mComSensorMgr.stopSensor();
 		mSoundMgr.stopMesaure();
+		stopCoarseLocationService();
 	}
 	
 	@Override
@@ -128,15 +127,9 @@ public class UnoService extends Service {
 	private static String DEVICE_LOCAL_LISTEN_IP = null;
 	private ServerSocket tcpServer = null;
 	private TCPListenThread tcplist = null;
-	private DatagramSocket udpServer = null;
-	private UDPListenThread udplist = null;
-	private ServerSocket scfServer = null;
-	private SocketFileListenThread sfclist = null;
 	private int BatteryLevel = -1;
 	private CommonSensorManager mComSensorMgr = null;
 	private SoundMeterManager mSoundMgr = null;
-	private final Handler mhandler = new Handler();
-	private Intent broadcastIntent;
     private BroadcastReceiver mBatReceiver = new BroadcastReceiver() {
     	
     	@Override
@@ -147,61 +140,13 @@ public class UnoService extends Service {
     };
     private String passiveProvider = LocationManager.PASSIVE_PROVIDER;
     private LocationManager mLocationMgr = null;
-    private Location mLoc = null;
-    private final int resultCode = 0;
-    private final String locAction = "com.Uno.unoAndroid.UnoService.LOCATION_UPDATE_RECEIVED";
-    int LocationFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-    private BroadcastReceiver mLocationReceiver = new BroadcastReceiver() {
-
-		@Override
-		public void onReceive(Context arg0, Intent arg1) {
-			mLoc = (Location) arg1.getExtras().get(LocationManager.KEY_LOCATION_CHANGED);
-			
-		}
-    	
-    };
-    private BroadcastReceiver mUiMessageReceiver = new BroadcastReceiver() {
-
-		@Override
-		public void onReceive(Context arg0, Intent arg1) {
-			if (arg1.getAction().equals(UI_MESSAGE_ACTION)) {
-				
-				// Message that handled by Governor.
-				if (arg1.getExtras().containsKey("UI_MSG_STREAM_TO_GOVERNOR")) {
-					String rawMsg = arg1.getExtras().getString("UI_MSG_STREAM_TO_GOVERNOR");
-					TCPSendMessage s = new TCPSendMessage(GOVERNOR_IP, 11314, rawMsg);
-					s.run();
-				}
-				// Message that handled by Service.
-				if (arg1.getExtras().containsKey("UI_MSG_STREAM_TO_SERVICE")) {
-					String rawMsg = arg1.getExtras().getString("UI_MSG_STREAM_TO_SERVICE");
-					
-					String [] argv = rawMsg.split("\\|");
-					int argc = argv.length;
-					
-					if (argc == 1) {
-						
-					}
-					else if (argc == 2) {
-						
-					}
-					else if (argc == 3) {
-						if (argv[0].equals("LOGIN")) {
-							String outgoingMsg = rawMsg+"|"+getDeviceMetadata();
-							TCPSendMessage s = new TCPSendMessage(GOVERNOR_IP, 11314, outgoingMsg);
-							s.run();
-						}
-					}
-				}
-			}
-			
-		}
-    	
-    };
-    private final static String UI_MESSAGE_ACTION = "com.UnoAndroid.UI_MSG_TO_SERVICE";
-	private final static String SERVICE_MESSAGE_ACTION = "com.UnoAndroid.SERVICE_MSG_TO_UI";
     
 	
+    /*
+     * Network message parser deal with incoming request from server or peer smartphone.
+     * 
+     * */
+    
 	private void NetworkMessageParser(Context c, String msg, Socket client) {
 		
 		String [] argv = msg.split("\\|");
@@ -253,56 +198,9 @@ public class UnoService extends Service {
 		}
 	}
 	
-	private String [] readSensorValues (String type) {
-		String [] val = new String[4];
-		if (type.equals("TYPE_ACCELEROMETER")) {
-			val[0] = String.valueOf(mComSensorMgr.accX);
-			val[1] = String.valueOf(mComSensorMgr.accY);
-			val[2] = String.valueOf(mComSensorMgr.accZ);
-			val[3] = "N/A";
-		}
-		else if (type.equals("TYPE_GRAVITY")) {
-			val[0] = String.valueOf(mComSensorMgr.gravityX);
-			val[1] = String.valueOf(mComSensorMgr.gravityY);
-			val[2] = String.valueOf(mComSensorMgr.gravityZ);
-			val[3] = "N/A";
-		}
-		else if (type.equals("TYPE_GYROSCOPE")) {
-			val[0] = String.valueOf(mComSensorMgr.spin);
-			val[1] = String.valueOf(mComSensorMgr.output);
-			val[2] = String.valueOf(mComSensorMgr.input);
-			val[3] = "N/A";
-		}
-		else if (type.equals("TYPE_LIGHT")) {
-			val[0] = String.valueOf(mComSensorMgr.light);
-			val[1] = val[2] = val[3] = "N/A";
-		}
-		else if (type.equals("TYPE_MAGNETIC_FIELD")) {
-			val[0] = String.valueOf(mComSensorMgr.magX);
-			val[1] = String.valueOf(mComSensorMgr.magY);
-			val[2] = String.valueOf(mComSensorMgr.magZ);
-			val[3] = "N/A";
-		}
-		else if (type.equals("TYPE_ORIENTATION")) {
-			val[0] = String.valueOf(mComSensorMgr.rotationX);
-			val[1] = String.valueOf(mComSensorMgr.rotationY);
-			val[2] = String.valueOf(mComSensorMgr.rotationZ);
-			val[3] = "N/A";
-		}
-		else if (type.equals("TYPE_PROXIMITY")) {
-			val[0] = String.valueOf(mComSensorMgr.proximity);
-			val[1] = val[2] = val[3] = "N/A";
-		}
-		else if (type.equals("TYPE_SOUNDMETER")) {
-			val[0] = String.valueOf(UnoService.soundPressureValue);
-			val[1] = val[2] = val[3] = "N/A";
-		}
-		else if (type.equals("LOCATION")) {
-			val[0] = val[1] = val[2] = val[3] = "N/A";
-		}
-		
-		return val;
-	}
+	/*
+	 * TCP listener on the 11314 port and message sender.
+	 * */
 	
 	private class TCPListenThread extends Thread {
 		
@@ -340,76 +238,147 @@ public class UnoService extends Service {
     		catch (Exception e) {}
     	}
 	}
+	
+	private void sendTcpPacket(String ip, int port, String msg) {
+    	try	{
+    		InetAddress remoteAddr = InetAddress.getByName(ip);
+    		Socket socket = new Socket(remoteAddr, port);
+    		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+    		out.println(msg);
+    		socket.close();
+    		Log.d("TCP", "send done.");
+    	}
+    	catch (Exception e)
+    	{
+    		Log.e("TCP", e.toString());
+    	}
+    }
+    
+    
+    private void sendUdpPacket(String ip, int port, String msg) {
+    	try {
+    		InetAddress serveraddr = InetAddress.getByName(ip);
+    		DatagramSocket socket = new DatagramSocket();
+    		byte [] buf = msg.getBytes();
+    		DatagramPacket packet = new DatagramPacket(buf, buf.length, serveraddr, port);
+    		socket.send(packet);
+    		Log.e("UDP", "Send Done");
+    	}
+    	catch (Exception e) {
+    		Log.e("UDP", e.toString());
+    	}
+    }
+	
+	/*
+	 * This part is to do location service.
+	 * */
+	
+	private LocationListener coarseListener = new LocationListener() {
 
-	private class UDPListenThread extends Thread {
+		public void onLocationChanged(Location location) {
+			UnoService.passiveLatitude = location.getLatitude();
+			UnoService.passiveLongitude = location.getLongitude();
+			UnoService.passiveAltitude = location.getAltitude();
+			UnoService.passiveAccuracy = location.getAccuracy();
+			
+		}
+
+		public void onProviderDisabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void onProviderEnabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void onStatusChanged(String provider, int status, Bundle extras) {
+			// TODO Auto-generated method stub
+			
+		}
 		
-		@Override
-    	public void run() {
-    		
-    		try {   			
-    			if (DEVICE_LOCAL_LISTEN_IP == null)
-    				DEVICE_LOCAL_LISTEN_IP = getLocalIPAddr();
-    			if (DEVICE_LOCAL_LISTEN_IP != null) {
-    				udpServer = new DatagramSocket(11315);
-	    			while (true) {
-	    				byte [] buf = new byte[1024];
-	        			DatagramPacket packet = new DatagramPacket(buf, buf.length);
-	    				udpServer.receive(packet);
-		    			String incomingMsg = new String(buf, 0,buf.length).trim();
-		    			
-		    			//NetworkMessageParser(incomingMsg);
-	    			}
-    			}
-    		}
-    		catch(Exception e) {}
-    	}
-    }
+	};
 	
-	private class SocketFileListenThread extends Thread {
+	private LocationListener fineListener = new LocationListener() {
+
+		public void onLocationChanged(Location location) {
+			UnoService.passiveLatitude = location.getLatitude();
+			UnoService.passiveLongitude = location.getLongitude();
+			UnoService.passiveAltitude = location.getAltitude();
+			UnoService.passiveAccuracy = location.getAccuracy();
+			
+		}
+
+		public void onProviderDisabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void onProviderEnabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void onStatusChanged(String provider, int status, Bundle extras) {
+			// TODO Auto-generated method stub
+			
+		}
 		
-		@Override
-    	public void run() {
-    		try {
-    			if (DEVICE_LOCAL_LISTEN_IP == null)
-    				DEVICE_LOCAL_LISTEN_IP = getLocalIPAddr();
-    			if (DEVICE_LOCAL_LISTEN_IP != null) {
-    				scfServer = new ServerSocket(11316);
-    				while (true) {
-    					Socket client = scfServer.accept();
-    					try {
-    						BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-    						String line = "";
-    						String incomingMsg = in.readLine();
-    						
-    						String [] data = incomingMsg.split("\\|");
-    						
-    						if (data[0].equals("FTP")) {
-    							File f = new File(data[1]);
-    							byte [] buf = new byte[client.getSendBufferSize()];
-    							FileInputStream fis = new FileInputStream(f);
-    							BufferedInputStream bis = new BufferedInputStream(fis);
-    							OutputStream os = client.getOutputStream();
-    							while (bis.read(buf) > 0) {
-    								os.write(buf);
-    								os.flush();
-    								buf = new byte[client.getSendBufferSize()];
-    							}
-    							client.close();
-    						}
-    					}
-    					catch (Exception e)
-    					{
-    						client.close();
-    					}
-    				}
-    			}
-    		}
-    		catch (Exception e) {}
-    	}
-    }
+	};
 	
+	private Criteria createCoarseCriteria() {
+		Criteria c = new Criteria();
+		c.setAccuracy(Criteria.ACCURACY_COARSE);
+		c.setAltitudeRequired(false);
+		//c.setAccuracy(100);
+		c.setBearingAccuracy(Criteria.ACCURACY_COARSE);
+		//c.setBearingRequired(false);
+		c.setSpeedRequired(false);
+		c.setCostAllowed(true);
+		c.setPowerRequirement(Criteria.POWER_LOW);
+		return c;
+	}
 	
-	// TODO Location Service. Google IO 2011 provides new methods.
+	private Criteria createFineCriteria() {
+		Criteria c = new Criteria();
+		c.setAccuracy(Criteria.ACCURACY_FINE);
+		c.setAltitudeRequired(false);
+		//c.setBearingRequired(false);
+		c.setBearingAccuracy(Criteria.ACCURACY_FINE);
+		c.setSpeedRequired(false);
+		c.setCostAllowed(true);
+		c.setPowerRequirement(Criteria.POWER_HIGH);
+		return c;
+	}
+	
+	private void startCoarseLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createCoarseCriteria(), true));
+		mLocationMgr.requestLocationUpdates(locp.getName(), 0, 0, coarseListener);
+	}
+	
+	private void stopCoarseLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createCoarseCriteria(), true));
+		mLocationMgr.removeUpdates(coarseListener);
+	}
+	
+	private void startFineLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createFineCriteria(), true));
+		mLocationMgr.requestLocationUpdates(locp.getName(), 0, 0, fineListener);
+	}
+	
+	private void stopFineLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createCoarseCriteria(), true));
+		mLocationMgr.removeUpdates(fineListener);
+	}
+	
+	/*
+	 * This part is for common sensor.
+	 * */
     
     private class CommonSensorManager implements SensorEventListener {
     	
@@ -599,14 +568,9 @@ public class UnoService extends Service {
     	public void onSensorChanged(SensorEvent event) {
     		
     		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-    			this.accX = event.values[0];
-    			this.accY = event.values[1];
-    			this.accZ = event.values[2];
-    			
-    			Intent intent = new Intent();
-    			intent.setAction(SERVICE_MESSAGE_ACTION);
-    			intent.putExtra("TYPE_ACCELEROMETER", String.valueOf(accX)+":"+String.valueOf(accY)+":"+String.valueOf(accZ));
-    			mCtx.sendBroadcast(intent);
+    			this.accX = event.values[0]-this.gravityX;
+    			this.accY = event.values[1]-this.gravityY;
+    			this.accZ = event.values[2]-this.gravityZ;
     			
     			if (isLogging) {
     				try {
@@ -744,6 +708,64 @@ public class UnoService extends Service {
     	}
     }
     
+    private String [] readSensorValues (String type) {
+		String [] val = new String[4];
+		if (type.equals("TYPE_ACCELEROMETER")) {
+			val[0] = String.valueOf(mComSensorMgr.accX);
+			val[1] = String.valueOf(mComSensorMgr.accY);
+			val[2] = String.valueOf(mComSensorMgr.accZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_GRAVITY")) {
+			val[0] = String.valueOf(mComSensorMgr.gravityX);
+			val[1] = String.valueOf(mComSensorMgr.gravityY);
+			val[2] = String.valueOf(mComSensorMgr.gravityZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_GYROSCOPE")) {
+			val[0] = String.valueOf(mComSensorMgr.spin);
+			val[1] = String.valueOf(mComSensorMgr.output);
+			val[2] = String.valueOf(mComSensorMgr.input);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_LIGHT")) {
+			val[0] = String.valueOf(mComSensorMgr.light);
+			val[1] = val[2] = val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_MAGNETIC_FIELD")) {
+			val[0] = String.valueOf(mComSensorMgr.magX);
+			val[1] = String.valueOf(mComSensorMgr.magY);
+			val[2] = String.valueOf(mComSensorMgr.magZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_ORIENTATION")) {
+			val[0] = String.valueOf(mComSensorMgr.rotationX);
+			val[1] = String.valueOf(mComSensorMgr.rotationY);
+			val[2] = String.valueOf(mComSensorMgr.rotationZ);
+			val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_PROXIMITY")) {
+			val[0] = String.valueOf(mComSensorMgr.proximity);
+			val[1] = val[2] = val[3] = "N/A";
+		}
+		else if (type.equals("TYPE_SOUNDMETER")) {
+			val[0] = String.valueOf(UnoService.soundPressureValue);
+			val[1] = val[2] = val[3] = "N/A";
+		}
+		else if (type.equals("LOCATION")) {
+			val[0] = String.valueOf(UnoService.passiveLatitude);
+			val[1] = String.valueOf(UnoService.passiveLongitude);
+			val[2] = String.valueOf(UnoService.passiveAltitude);
+			val[3] = String.valueOf(UnoService.passiveAccuracy);
+		}
+		
+		return val;
+	}
+    
+    /*
+     * This part is sound meter.
+     * */
+    
     private class SoundMeterManager extends Thread {
     	private boolean isRunning = false;
     	private boolean isLogging = false;
@@ -826,130 +848,10 @@ public class UnoService extends Service {
     		}
     	}
     }
-
-    private class TCPSendMessage extends Thread {
-    	
-    	private String DestIpAddr = null;
-    	private int DestPort = -1;
-    	private String Msg = null;
-    	
-    	public TCPSendMessage(String ip, int port, String msg) {
-    		this.DestIpAddr = ip;
-    		this.DestPort = port;
-    		this.Msg = msg;
-    	}
-    	
-    	@Override
-    	public void run() {
-    		try	{
-        		InetAddress remoteAddr = InetAddress.getByName(DestIpAddr);
-        		Socket socket = new Socket(remoteAddr, DestPort);
-        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
-        		out.println(Msg);
-        		socket.close();
-        		Log.d("TCP", "send done.");
-        	}
-        	catch (Exception e)
-        	{
-        		Log.e("TCP", e.toString());
-        	}
-    	}
-    }
     
-    private void sendTcpPacket(String ip, int port, String msg) {
-    	try	{
-    		InetAddress remoteAddr = InetAddress.getByName(ip);
-    		Socket socket = new Socket(remoteAddr, port);
-    		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
-    		out.println(msg);
-    		socket.close();
-    		Log.d("TCP", "send done.");
-    	}
-    	catch (Exception e)
-    	{
-    		Log.e("TCP", e.toString());
-    	}
-    }
-    
-    private class UDPSendMessage extends Thread {
-    	private String DestIpAddr = null;
-    	private int DestPort = -1;
-    	private String Msg = null;
-    	
-    	public UDPSendMessage(String ip, int port, String msg) {
-    		this.DestIpAddr = ip;
-    		this.DestPort = port;
-    		this.Msg = msg;
-    	}
-    	
-    	@Override
-    	public void run() {
-    		try {
-        		InetAddress serveraddr = InetAddress.getByName(DestIpAddr);
-        		DatagramSocket socket = new DatagramSocket();
-        		byte [] buf = Msg.getBytes();
-        		DatagramPacket packet = new DatagramPacket(buf, buf.length, serveraddr, DestPort);
-        		socket.send(packet);
-        		Log.d("UDP", "Send Done");
-        	}
-        	catch (Exception e) {
-        		Log.e("UDP", e.toString());
-        	}
-    	}
-    }
-    
-    private void sendUdpPacket(String ip, int port, String msg) {
-    	try {
-    		InetAddress serveraddr = InetAddress.getByName(ip);
-    		DatagramSocket socket = new DatagramSocket();
-    		byte [] buf = msg.getBytes();
-    		DatagramPacket packet = new DatagramPacket(buf, buf.length, serveraddr, port);
-    		socket.send(packet);
-    		Log.e("UDP", "Send Done");
-    	}
-    	catch (Exception e) {
-    		Log.e("UDP", e.toString());
-    	}
-    }
-    
-    private class FileRequestSendMessage extends Thread {
-    	private String FileSourceDir = "";
-    	private String RequestIp = "";
-    	private String FileDestinationDir = "";
-    	
-    	public FileRequestSendMessage(String src, String ip, String dest) {
-    		this.FileSourceDir = src;
-    		this.RequestIp = ip;
-    		this.FileDestinationDir = dest;
-    	}
-    	
-        public void run() {
-        	String msg = "FTP|"+FileSourceDir;
-        	try {
-        		InetAddress remote = InetAddress.getByName(RequestIp);
-        		Socket s = new Socket(remote, 11316);
-        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(s.getOutputStream())), true);
-        		out.println(msg);
-
-        		// receive file and write to local address.
-        		InputStream sin = s.getInputStream();
-        		
-        		byte [] buf = new byte[s.getReceiveBufferSize()];
-        		BufferedOutputStream bout = new BufferedOutputStream(new FileOutputStream(new File(FileDestinationDir), true)); // append.
-
-        		while (true) {
-        			int nbytes = sin.read(buf);
-        			if (nbytes < 0) break;
-        			bout.write(buf, 0, nbytes);
-        			bout.flush();
-        		}
-        		bout.close();
-        	}
-        	catch (Exception e) {
-        		Log.e("SocketFile", e.toString());
-        	}
-        }
-    }
+    /*
+     * This part is about local hardware.
+     * */
     
 	private String getLocalIPAddr() {
     	try {
@@ -997,45 +899,72 @@ public class UnoService extends Service {
     	return metadata;
 	}
 	
+	/*
+	 * Setup sensor object files in the system.
+	 * */
 	
-    private void setupSensorsPipeFile() {
-    	File f = new File("/mnt/sdcard/Sensors/TYPE_ACCELEROMETER");
+	private void setupSensorsObjectFile() {
+    	File f = new File("/mnt/sdcard/Sensors");
     	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_ACCELEROMETER");
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_GRAVITY");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_GYROSCOPE");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_LIGHT");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_LINEAR_ACCELERATION");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_MAGNETIC_FIELD");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_ORIENTATION");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_PRESSURE");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_PROXIMITY");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_ROTATION_VECTOR");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_TEMPERATURE");
-    	if (!f.exists()) f.mkdirs();
-    	
-    	f = new File("/mnt/sdcard/Sensors/TYPE_SOUNDMETER");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/LOCATION");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     }
 }
