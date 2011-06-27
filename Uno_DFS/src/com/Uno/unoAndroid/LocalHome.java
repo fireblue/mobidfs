@@ -24,6 +24,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -46,47 +47,7 @@ public class LocalHome extends ListActivity {
 	private ArrayList <String> pwdChildString = new ArrayList <String> ();
 	private ArrayList <File> pwdChild = new ArrayList <File> ();
 	private ProgressDialog pgDialog;
-	//private final static String UI_MESSAGE_ACTION = "com.UnoAndroid.UI_MSG_TO_SERVICE";
-	//private final static String SERVICE_MESSAGE_ACTION = "com.UnoAndroid.SERVICE_MSG_TO_UI";
 	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
-	/*private BroadcastReceiver mServiceBroadcastReceiver = new BroadcastReceiver () {
-
-		@Override
-		public void onReceive(Context arg0, Intent arg1) {
-			if (arg1.getAction().endsWith(SERVICE_MESSAGE_ACTION)) {
-				if (arg1.getExtras().containsKey("GOVERNOR_MSG_STREAM_TO_UI")) {
-					GovernorMessageParser(arg1.getExtras().getString("GOVERNOR_MSG_STREAM_TO_UI"));
-				}
-				else if (arg1.getExtras().containsKey("SERVICE_MSG_STREAM_TO_UI")) {
-					ServiceMessageParser(arg1.getExtras().getString("SERVICE_MSG_STREAM_TO_UI"));
-				}
-			}
-			
-		}
-		
-	};*/
-	
-	/*private void ServiceMessageParser(String msg) {
-		String [] argv = msg.split("\\|");
-		int argc = argv.length;
-		
-		if (argc == 1) {
-			
-		}
-		else if (argc == 2) {
-			if (argv[0].equals("SETPUBLIC")) {
-				if (argv[1].equals("Done"))
-					pgDialog.dismiss();
-				else if (argv[1].equals("Failed")) {
-					pgDialog.dismiss();
-					Toast.makeText(getApplicationContext(), "Synchronization failed, please retry later...", Toast.LENGTH_SHORT).show();
-				}
-			}
-		}
-		else if (argc == 3) {
-			
-		}
-	}*/
 	
 	private void GovernorMessageParser(String msg) {
 		String [] argv = msg.split("\\|");
@@ -145,7 +106,6 @@ public class LocalHome extends ListActivity {
 		}
 		adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, pwdChildString);
 		setListAdapter(adapter);
-		//registerReceiver(mServiceBroadcastReceiver, new IntentFilter(SERVICE_MESSAGE_ACTION));
 	}
 
 	@Override
@@ -196,7 +156,7 @@ public class LocalHome extends ListActivity {
 		else {	
 			//final String selectedFileName = keyword;
 			final int pos = position;
-			final String [] options = {"File Metadata", "Share"};
+			final String [] options = {"File Metadata", "Share", "Preview"};
 			AlertDialog.Builder optBuilder = new AlertDialog.Builder(this);
 			optBuilder.setTitle("Actions");
 			optBuilder.setSingleChoiceItems(options, -1, new DialogInterface.OnClickListener() {
@@ -204,11 +164,15 @@ public class LocalHome extends ListActivity {
 			    	if (item == 0) {
 			    		dialog.dismiss();
 			    		//String x = pwd.getAbsolutePath() + "/" + selectedFileName;
-			    		showFileMetadata(pwdChild.get(pos-1).getAbsolutePath());
+			    		showFileMetadata(pwdChild.get(pos).getAbsolutePath());
+			    	}
+			    	else if (item == 1){
+			    		dialog.dismiss();
+			    		showFileShare(pwdChild.get(pos).getAbsolutePath());
 			    	}
 			    	else {
 			    		dialog.dismiss();
-			    		showFileShare(pwdChild.get(pos-1).getAbsolutePath());
+			    		showPreview(pwdChild.get(pos).getAbsolutePath());
 			    	}
 			    }
 			});
@@ -259,10 +223,6 @@ public class LocalHome extends ListActivity {
 		    			metadata += str + "%";
 		    		}
 		    		metadata = metadata.substring(0, metadata.length()-1);
-		    		// Talk to Governor via Service.
-		    		/*Intent intent = new Intent(UI_MESSAGE_ACTION);
-		    		intent.putExtra("UI_MSG_STREAM_TO_GOVERNOR", "SETPUBLIC|FILE|"+filepath+"|"+metadata);
-		    		sendBroadcast(intent);*/
 
 		    		pgDialog = ProgressDialog.show(LocalHome.this, "", "Synchronizing to Server. Please wait...", true);
 		    		pgDialog.show();
@@ -276,11 +236,6 @@ public class LocalHome extends ListActivity {
 		    		showAccessList(filepath);
 		    	}
 		    	else {
-		    		// Talk to Governor via Service.
-		    		/*Intent intent = new Intent(UI_MESSAGE_ACTION);
-		    		intent.putExtra("UI_MSG_STREAM_TO_GOVERNOR", "OFFLINE|FILE|"+filepath);
-		    		sendBroadcast(intent);*/
-
 		    		pgDialog = ProgressDialog.show(LocalHome.this, "", "Synchronizing to Server. Please wait...", true);
 		    		pgDialog.show();
 		    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "OFFLINE|FILE|"+filepath);
@@ -326,11 +281,7 @@ public class LocalHome extends ListActivity {
 	    			metadata += str + "%";
 	    		}
 	    		metadata = metadata.substring(0, metadata.length()-1);
-	    		
-	    		// Talk to Governor via Service.
-	    		/*Intent intent = new Intent(UI_MESSAGE_ACTION);
-	    		intent.putExtra("UI_MSG_STREAM_TO_GOVERNOR", "SETPRIVATE|FILE|"+filepath+"|"+metadata+"|"+accesslist);
-	    		sendBroadcast(intent);*/
+
 	    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "SETPRIVATE|FILE|"+filepath+"|"+metadata+"|"+accesslist);
 	    		if (reply == null) return;
 	    		GovernorMessageParser(reply);
@@ -342,6 +293,40 @@ public class LocalHome extends ListActivity {
 				pgDialog.dismiss();
 				accAlert.dismiss();
 			}});
+	}
+	
+	private void showPreview(String path) {
+
+		if (path.endsWith(".jpg") || path.endsWith(".png") || path.endsWith(".jpeg") || path.endsWith(".jpe") || 
+				path.endsWith(".jfif") || path.endsWith(".gif") || path.endsWith(".tif") || path.endsWith(".tiff") ||
+				path.endsWith(".bmp")) {
+			Intent intent = new Intent(LocalHome.this, imgPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			LocalHome.this.startActivity(intent);
+		}
+		else if (path.endsWith(".txt")) {
+			Intent intent = new Intent(LocalHome.this, txtPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			LocalHome.this.startActivity(intent);
+		}
+		else if (path.endsWith(".pdf")) {
+			Intent intent = new Intent(LocalHome.this, pdfPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			LocalHome.this.startActivity(intent);
+		}
+		else if (path.equals("TYPE_ACCELEROMETER") || path.equals("TYPE_GRAVITY") || path.equals("TYPE_GYROSCOPE") ||
+				path.equals("TYPE_LIGHT") || path.equals("TYPE_MAGNETIC_FIELD") || path.equals("TYPE_ORIENTATION") ||
+				path.equals("TYPE_PRESSURE") || path.equals("TYPE_PROXIMITY") || path.equals("TYPE_LINEAR_ACCELERATION") ||
+				path.equals("TYPE_ROTATION_VECTOR") || path.equals("TYPE_TEMPERATURE")) {
+			Intent intent = new Intent(LocalHome.this, txtPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			LocalHome.this.startActivity(intent);
+		}
+		else {
+			Toast.makeText(getApplicationContext(), "Not support this file type...", Toast.LENGTH_LONG).show();
+			Vibrator vbr = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+			vbr.vibrate(300);
+		}
 	}
 	
 	private String [] getLocalFileMetadata (String path)
