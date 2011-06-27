@@ -199,40 +199,67 @@ public class LoginPage extends Activity {
 	}
     
     private void setupSensorsPipeFile() {
-    	File f = new File("/mnt/sdcard/Sensors/TYPE_ACCELEROMETER");
+    	File f = new File("/mnt/sdcard/Sensors");
     	if (!f.exists()) f.mkdirs();
+    	
+    	f = new File("/mnt/sdcard/Sensors/TYPE_ACCELEROMETER");
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_GRAVITY");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_GYROSCOPE");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_LIGHT");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_LINEAR_ACCELERATION");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_MAGNETIC_FIELD");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_ORIENTATION");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_PRESSURE");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_PROXIMITY");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_ROTATION_VECTOR");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/TYPE_TEMPERATURE");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     	
     	f = new File("/mnt/sdcard/Sensors/LOCATION");
-    	if (!f.exists()) f.mkdirs();
+    	try {
+    		if (!f.exists()) f.createNewFile();
+    	} catch (Exception e) {}
     }
 }
