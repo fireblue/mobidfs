@@ -2,6 +2,8 @@ package com.Uno.unoAndroid;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -86,6 +88,22 @@ public class RegisterPage extends Activity {
     		String reply = sendTcpPacket(GOVERNOR_IP, 11314, registerMsg);
     		if (reply == null) return;
     		GovernorMessageParser(reply);
+    		
+    		/*
+    		 * Record username.
+    		 * */
+    		try {
+    			File dir = new File("/mnt/sdcard/Uno");
+    			if (!dir.exists()) dir.mkdirs();
+    			
+    			File f = new File("/mnt/sdcard/Uno/sys.ini");
+    			f.deleteOnExit();
+    			f.createNewFile();
+    			FileOutputStream fos = new FileOutputStream(f);
+    			fos.write(usr.getBytes());
+    			fos.flush();
+    			fos.close();
+    		} catch (Exception e) {}
     	}
     }
     

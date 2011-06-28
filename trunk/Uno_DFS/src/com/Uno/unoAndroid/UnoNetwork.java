@@ -103,9 +103,11 @@ public class UnoNetwork extends ListActivity {
 						}
 						else if (arg1 == 1){
 							// TODO Logging sensor.
+							startLoggingProcess(pos);
 						}
 						else {
 							// TODO stop logging.
+							stopLoggingProcess(pos);
 						}
 						
 					}
@@ -436,5 +438,16 @@ public class UnoNetwork extends ListActivity {
 			Vibrator vbr = (Vibrator) getSystemService(VIBRATOR_SERVICE);
 			vbr.vibrate(300);
 		}
+	}
+	
+	/*
+	 * Logging operations, username can be found in /mnt/sdcard/Uno/sys.ini
+	 * */
+	private void startLoggingProcess(int pos) {
+		
+	}
+	
+	private void stopLoggingProcess(int pos) {
+		
 	}
 }
