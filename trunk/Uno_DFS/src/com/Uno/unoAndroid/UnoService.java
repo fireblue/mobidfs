@@ -7,7 +7,9 @@ import java.io.BufferedWriter;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -23,6 +25,8 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Set;
 
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -160,6 +164,24 @@ public class UnoService extends Service {
 		}
 		else if (argc == 3) {
 			if (argv[0].equals("PIN")) {
+				if (argv[1].equals("FILE")) {
+					
+					try {
+						File f = new File(argv[2]);
+						byte [] buf = new byte[client.getSendBufferSize()];
+						FileInputStream fis = new FileInputStream(f);
+						BufferedInputStream bis = new BufferedInputStream(fis);
+						OutputStream os = client.getOutputStream();
+						while (bis.read(buf) > 0) {
+							os.write(buf);
+							os.flush();
+							buf = new byte[client.getSendBufferSize()];
+						}
+					}
+					catch (Exception e) {}
+				}
+			}
+			else if (argv[0].equals("PREVIEW")) {
 				if (argv[1].equals("FILE")) {
 					
 					try {
@@ -376,6 +398,32 @@ public class UnoService extends Service {
 		mLocationMgr.removeUpdates(fineListener);
 	}
 	
+	private HashMap <String, FileOutputStream> logLocationHashMap = new HashMap <String, FileOutputStream>();
+	private String locationBasePath = "/mnt/sdcard/Uno/SensorLogs/LOCATION";
+	
+	private void startLoggingLocation(String requestor) throws IOException {
+		File dir = new File (locationBasePath);
+		if (!dir.exists()) dir.mkdirs();
+		
+		File f = new File (locationBasePath+"/"+requestor);
+		f.deleteOnExit();
+		f.createNewFile();
+		
+		this.logLocationHashMap.put(requestor, new FileOutputStream(f));
+	}
+	
+	private void stopLoggingLocation(String requestor) throws IOException {
+		this.logLocationHashMap.get(requestor).close();
+		this.logLocationHashMap.remove(requestor);
+	}
+	
+	private void resetAllLocationLogs() throws IOException {
+		for (String key: this.logLocationHashMap.keySet()) {
+			this.logLocationHashMap.get(key).close();
+			this.logLocationHashMap.remove(key);
+		}
+	}
+	
 	/*
 	 * This part is for common sensor.
 	 * */
@@ -383,7 +431,15 @@ public class UnoService extends Service {
     private class CommonSensorManager implements SensorEventListener {
     	
     	private SensorManager mSensorManager;
-    	private boolean isLogging;
+    	
+    	// sensor log control.
+    	private HashMap <String, FileOutputStream> logAccelerometerHashMap = new HashMap <String, FileOutputStream>();
+    	private HashMap <String, FileOutputStream> logGyroscopemeterHashMap = new HashMap <String, FileOutputStream>();
+    	private HashMap <String, FileOutputStream> logLightmeterHashMap = new HashMap <String, FileOutputStream>();
+    	private HashMap <String, FileOutputStream> logMagnetometerHashMap = new HashMap <String, FileOutputStream>();
+    	private HashMap <String, FileOutputStream> logOrientationmeterHashMap = new HashMap <String, FileOutputStream>();
+    	private HashMap <String, FileOutputStream> logProximitymeterHashMap = new HashMap <String, FileOutputStream>();
+    	private HashMap <String, FileOutputStream> logGravitymeterHashMap = new HashMap <String, FileOutputStream>();
     	
     	// Accelerometer Service
     	private Sensor Accelerometer;
@@ -423,22 +479,14 @@ public class UnoService extends Service {
     	public double gravityY;
     	public double gravityZ;
     	
-    	// Sensor Filenames
-    	private final String senAccelerometer = "Accelerometer.sensor";
-    	private final String senLightmeter = "Lightmeter.sensor";
-    	private final String senMagnetometer = "Magnetometer.sensor";
-    	private final String senOrientationmeter = "Orientationmeter.sensor";
-    	private final String senProximitymeter = "Proximitymeter.sensor";
-    	private final String senGravitymeter = "Gravitymeter.sensor";
-    	private final String senGyroscopemeter = "Gyroscopemeter.sensor";
-    	
-    	private FileOutputStream accfos;
-    	private FileOutputStream lightfos;
-    	private FileOutputStream magfos;
-    	private FileOutputStream orifos;
-    	private FileOutputStream proxfos;
-    	private FileOutputStream gravfos;
-    	private FileOutputStream gyrfos;
+    	// Sensor log base file name
+    	private final String accelerometerBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_ACCELEROMETER";
+    	private final String lightmeterBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_LIGHT";
+    	private final String magnetometerBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_MAGNETIC_FIELD";
+    	private final String orientationmeterBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_ORIENTATION";
+    	private final String proximitymeterBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_PROXIMITY";
+    	private final String gravitymeterBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_GRAVITY";
+    	private final String gyroscopemeterBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_GYROSCOPE";
     	
     	public CommonSensorManager()
     	{
@@ -465,29 +513,175 @@ public class UnoService extends Service {
     		}
     	}
     	
-    	public void startLogging() {
-    		this.isLogging = true;
+    	/*
+    	 * Different types of sensor logging control, using hash map.
+    	 * */
+    	
+    	// Accelerometer
+    	public void startLoggingAccelerometer(String requestor) throws IOException {
+    		
+    		File f= new File(this.accelerometerBasePath);
+    		if (!f.exists()) f.mkdirs();
+    		
+    		f = new File(this.accelerometerBasePath + "/" + requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		FileOutputStream os = new FileOutputStream(f);
+    		logAccelerometerHashMap.put(requestor, os);
     	}
     	
-    	public void stopLogging() {
-    		this.isLogging = false;
+    	public void stopLoggingAccelerometer(String requestor) throws IOException {
+    		logAccelerometerHashMap.get(requestor).close();
+    		logAccelerometerHashMap.remove(requestor);
     	}
     	
-    	public void resetLog() {
-    		File accf = new File("/mnt/sdcard/sensor/"+this.senAccelerometer);
-    		accf.deleteOnExit();
-    		File lightf = new File("/mnt/sdcard/sensor/"+this.senLightmeter);
-    		lightf.deleteOnExit();
-    		File magf = new File("/mnt/sdcard/sensor/"+this.senMagnetometer);
-    		magf.deleteOnExit();
-    		File orif = new File("/mnt/sdcard/sensor/"+this.senOrientationmeter);
-    		orif.deleteOnExit();
-    		File proxf = new File("/mnt/sdcard/sensor/"+this.senProximitymeter);
-    		proxf.deleteOnExit();
-    		File gravf = new File("/mnt/sdcard/sensor/"+this.senGravitymeter);
-    		gravf.deleteOnExit();
-    		File gyrf = new File("/mnt/sdcard/sensor/"+this.senGyroscopemeter);
-    		gyrf.deleteOnExit();
+    	// Gyroscopemeter
+    	public void startLoggingGyroscopemeter(String requestor) throws IOException {
+    		
+    		File f= new File(this.gyroscopemeterBasePath);
+    		if (!f.exists()) f.mkdirs();
+    		
+    		f = new File(this.gyroscopemeterBasePath + "/" + requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		FileOutputStream os = new FileOutputStream(f);
+    		logGyroscopemeterHashMap.put(requestor, os);
+    	}
+    	
+    	public void stopLoggingGyroscopemeter(String requestor) throws IOException {
+    		logGyroscopemeterHashMap.get(requestor).close();
+    		logGyroscopemeterHashMap.remove(requestor);
+    	}
+    	
+    	// Lightmeter
+    	public void startLoggingLightmeter(String requestor) throws IOException {
+    		
+    		File f= new File(this.lightmeterBasePath);
+    		if (!f.exists()) f.mkdirs();
+    		
+    		f = new File(this.lightmeterBasePath + "/" + requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		FileOutputStream os = new FileOutputStream(f);
+    		logLightmeterHashMap.put(requestor, os);
+    	}
+    	
+    	public void stopLoggingLightmeter(String requestor) throws IOException {
+    		logLightmeterHashMap.get(requestor).close();
+    		logLightmeterHashMap.remove(requestor);
+    	}
+    	
+    	// Magnetometer
+    	public void startLoggingMagnetometer(String requestor) throws IOException {
+    		
+    		File f= new File(this.magnetometerBasePath);
+    		if (!f.exists()) f.mkdirs();
+    		
+    		f = new File(this.magnetometerBasePath + "/" + requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		FileOutputStream os = new FileOutputStream(f);
+    		logMagnetometerHashMap.put(requestor, os);
+    	}
+    	
+    	public void stopLoggingMagnetometer(String requestor) throws IOException {
+    		logMagnetometerHashMap.get(requestor).close();
+    		logMagnetometerHashMap.remove(requestor);
+    	}
+    	
+    	// Orientationmeter
+    	public void startLoggingOrientationmeter(String requestor) throws IOException {
+    		
+    		File f= new File(this.orientationmeterBasePath);
+    		if (!f.exists()) f.mkdirs();
+    		
+    		f = new File(this.orientationmeterBasePath + "/" + requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		FileOutputStream os = new FileOutputStream(f);
+    		logOrientationmeterHashMap.put(requestor, os);
+    	}
+    	
+    	public void stopLoggingOrientationmeter(String requestor) throws IOException {
+    		logOrientationmeterHashMap.get(requestor).close();
+    		logOrientationmeterHashMap.remove(requestor);
+    	}
+    	
+    	// Proximitymeter
+    	public void startLoggingProximitymeter(String requestor) throws IOException {
+    		
+    		File f= new File(this.proximitymeterBasePath);
+    		if (!f.exists()) f.mkdirs();
+    		
+    		f = new File(this.proximitymeterBasePath + "/" + requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		FileOutputStream os = new FileOutputStream(f);
+    		logProximitymeterHashMap.put(requestor, os);
+    	}
+    	
+    	public void stopLoggingProximitymeter(String requestor) throws IOException {
+    		logProximitymeterHashMap.get(requestor).close();
+    		logProximitymeterHashMap.remove(requestor);
+    	}
+    	
+    	// Gravitymeter
+    	public void startLoggingGravitymeter(String requestor) throws IOException {
+    		
+    		File f= new File(this.gravitymeterBasePath);
+    		if (!f.exists()) f.mkdirs();
+    		
+    		f = new File(this.gravitymeterBasePath + "/" + requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		FileOutputStream os = new FileOutputStream(f);
+    		logGravitymeterHashMap.put(requestor, os);
+    	}
+    	
+    	public void stopLoggingGravitymeter(String requestor) throws IOException {
+    		logGravitymeterHashMap.get(requestor).close();
+    		logGravitymeterHashMap.remove(requestor);
+    	}
+    	
+    	/*
+    	 * Reset All logs.
+    	 * */
+    	public void resetAllLogs() throws IOException {
+    		
+    		for (String key: this.logAccelerometerHashMap.keySet()) {
+    			this.logAccelerometerHashMap.get(key).close();
+    			this.logAccelerometerHashMap.remove(key);
+    		}
+    		
+    		for (String key: this.logGravitymeterHashMap.keySet()) {
+    			this.logGravitymeterHashMap.get(key).close();
+    			this.logAccelerometerHashMap.remove(key);
+    		}
+    		
+    		for (String key: this.logGyroscopemeterHashMap.keySet()) {
+    			this.logGyroscopemeterHashMap.get(key).close();
+    			this.logGyroscopemeterHashMap.remove(key);
+    		}
+    		
+    		for (String key: this.logLightmeterHashMap.keySet()) {
+    			this.logLightmeterHashMap.get(key).close();
+    			this.logLightmeterHashMap.remove(key);
+    		}
+    		
+    		for (String key: this.logMagnetometerHashMap.keySet()) {
+    			this.logMagnetometerHashMap.get(key).close();
+    			this.logMagnetometerHashMap.remove(key);
+    		}
+    		
+    		for (String key: this.logOrientationmeterHashMap.keySet()) {
+    			this.logOrientationmeterHashMap.get(key).close();
+    			this.logOrientationmeterHashMap.remove(key);
+    		}
+    		
+    		for (String key: this.logProximitymeterHashMap.keySet()) {
+    			this.logProximitymeterHashMap.get(key).close();
+    			this.logProximitymeterHashMap.remove(key);
+    		}
     	}
     	
     	// Start sensing
@@ -499,44 +693,6 @@ public class UnoService extends Service {
     		mSensorManager.registerListener(this, this.Orientationmeter, SensorManager.SENSOR_DELAY_UI);
     		mSensorManager.registerListener(this, this.Proximitymeter, SensorManager.SENSOR_DELAY_UI);
     		mSensorManager.registerListener(this, this.Gravitymeter, SensorManager.SENSOR_DELAY_UI);
-    		
-    		if (!isLogging) return;
-    		try {
-    			File senDir = new File("/mnt/sdcard/sensor/");
-    			if (!senDir.exists()) senDir.mkdir();
-    			
-    			File accf = new File("/mnt/sdcard/sensor/"+this.senAccelerometer);
-    			if (!accf.exists()) accf.createNewFile();
-    			accfos = new FileOutputStream(accf, false);
-    			
-    			File lightf = new File("/mnt/sdcard/sensor/"+this.senLightmeter);
-    			if (!lightf.exists()) lightf.createNewFile();
-    			lightfos = new FileOutputStream(lightf, false);
-    			
-    			File magf = new File("/mnt/sdcard/sensor/"+this.senMagnetometer);
-    			if (!magf.exists()) magf.createNewFile();
-    			magfos = new FileOutputStream(magf, false);
-    			
-    			File orif = new File("/mnt/sdcard/sensor/"+this.senOrientationmeter);
-    			if (!orif.exists()) orif.createNewFile();
-    			orifos = new FileOutputStream(orif, false);
-    			
-    			File proxf = new File("/mnt/sdcard/sensor/"+this.senProximitymeter);
-    			if (!proxf.exists()) proxf.createNewFile();
-    			proxfos = new FileOutputStream(proxf, false);
-    			
-    			File gravf = new File("/mnt/sdcard/sensor/"+this.senGravitymeter);
-    			if (!gravf.exists()) gravf.createNewFile();
-    			gravfos = new FileOutputStream(gravf, false);
-    			
-    			File gyrf = new File("/mnt/sdcard/sensor/"+this.senGyroscopemeter);
-    			if (!gyrf.exists()) gyrf.createNewFile();
-    			gyrfos = new FileOutputStream(gyrf, false);
-    			
-    		} 
-    		catch (Exception e) {
-    			Log.e("Sensor", e.getMessage());
-    		}
     	}
     	
     	// Stop sensing
@@ -548,158 +704,150 @@ public class UnoService extends Service {
     		mSensorManager.unregisterListener(this, this.Orientationmeter);
     		mSensorManager.unregisterListener(this, this.Proximitymeter);
     		mSensorManager.unregisterListener(this, this.Gravitymeter);
-    		
-    		if (!isLogging) return;
-    		try {
-    			accfos.close();
-    			lightfos.close();
-    			magfos.close();
-    			orifos.close();
-    			proxfos.close();
-    			gravfos.close();
-    			gyrfos.close();
-    		} 
-    		catch (Exception e) {
-    			Log.e("Sensor", e.getMessage());
-    		}
-    		
     	}
     	
     	public void onSensorChanged(SensorEvent event) {
     		
     		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+    			
     			this.accX = event.values[0]-this.gravityX;
     			this.accY = event.values[1]-this.gravityY;
     			this.accZ = event.values[2]-this.gravityZ;
     			
-    			if (isLogging) {
+    			Date d = new Date();
+				String str = d.toGMTString()+":"+String.valueOf(this.accX) + ";" 
+						+ String.valueOf(this.accY) + ";" + String.valueOf(this.accZ) + "\n";
+				byte [] buf = str.getBytes();
+				
+    			for (String key: this.logAccelerometerHashMap.keySet()) {
     				try {
-    					Date d = new Date();
-	    				String str = d.toGMTString()+":"+String.valueOf(this.accX) + ";" + String.valueOf(this.accY) + ";" + String.valueOf(this.accZ);
-	    				byte [] buf = str.getBytes();
-	    				accfos.write(buf);
-	    				accfos.flush();
-	    			}
-	    			catch(Exception e) {
-	    				Log.e("Sensor", e.getMessage());
-	    			}
+						this.logAccelerometerHashMap.get(key).write(buf);
+						this.logAccelerometerHashMap.get(key).flush();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
     			}
-    			return;
     		}
-    		
-    		if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+    		else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+    			
     			this.spin = event.values[0];
     			this.output = event.values[1];
     			this.input = event.values[2];
     			
-    			if (isLogging) {
-	    			try {
-	    				Date d = new Date();
-	    				String str = d.toGMTString()+":"+String.valueOf(this.spin) + ";" + String.valueOf(this.output) + ";" + String.valueOf(this.input);
-	    				byte [] buf = str.getBytes();
-	    				gyrfos.write(buf);
-	    				gyrfos.flush();
-	    			}
-	    			catch(Exception e) {
-	    				Log.e("Sensor", e.getMessage());
-	    			}
-    			}
-    			return;
+    			Date d = new Date();
+				String str = d.toGMTString()+":"+String.valueOf(this.spin) + ";" 
+						+ String.valueOf(this.output) + ";" + String.valueOf(this.input)+"\n";
+				byte [] buf = str.getBytes();
+				
+				for (String key: this.logGyroscopemeterHashMap.keySet()) {
+					try {
+						this.logGyroscopemeterHashMap.get(key).write(buf);
+						this.logGyroscopemeterHashMap.get(key).flush();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
     		}
-    		
-    		if (event.sensor.getType() == Sensor.TYPE_LIGHT)
-    		{
+    		else if (event.sensor.getType() == Sensor.TYPE_LIGHT) {
+    			
     			this.light = event.values[0];
     			
-    			if (isLogging) {
-    				try {
-	    				String str = String.valueOf(this.light);
-	    				byte [] buf = str.getBytes();
-	    				lightfos.write(buf);
-	    				lightfos.flush();
-	    			}
-	    			catch(Exception e) {
-	    				Log.e("Sensor", e.getMessage());
-	    			}
-    			}
-    			return;
+    			Date d = new Date();
+				String str = d.toGMTString()+":"+String.valueOf(this.light)+"\n";
+				byte [] buf = str.getBytes();
+				
+				for (String key: this.logLightmeterHashMap.keySet()) {
+					try {
+						this.logLightmeterHashMap.get(key).write(buf);
+						this.logLightmeterHashMap.get(key).flush();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
     		}
-    		
-    		if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+    		else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+    			
     			this.magX = event.values[0];
     			this.magY = event.values[1];
     			this.magZ = event.values[2];
     			
-    			if (isLogging) {
-    				try {
-    					Date d = new Date();
-	    				String str = d.toGMTString()+":"+String.valueOf(this.magX) + ";" + String.valueOf(this.magY) + ";" + String.valueOf(this.magZ);
-	    				byte [] buf = str.getBytes();
-	    				magfos.write(buf);
-	    				magfos.flush();
-	    			}
-	    			catch(Exception e) {
-	    				Log.e("Sensor", e.getMessage());
-	    			}
-    			}
-    			return;
+    			Date d = new Date();
+				String str = d.toGMTString()+":"+String.valueOf(this.magX) + ";" 
+						+ String.valueOf(this.magY) + ";" + String.valueOf(this.magZ)+"\n";
+				byte [] buf = str.getBytes();
+    			
+				for (String key: this.logMagnetometerHashMap.keySet()) {
+					try {
+						this.logMagnetometerHashMap.get(key).write(buf);
+						this.logMagnetometerHashMap.get(key).flush();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
     		}
-    		
-    		if (event.sensor.getType() == Sensor.TYPE_ORIENTATION) {
+    		else if (event.sensor.getType() == Sensor.TYPE_ORIENTATION) {
+    			
     			this.rotationX = event.values[0];
     			this.rotationY = event.values[1];
     			this.rotationZ = event.values[2];
     			
-    			if (isLogging) {	
-    				try {
-    					Date d = new Date();
-	    				String str = d.toGMTString()+":"+String.valueOf(this.rotationX) + ";" + String.valueOf(this.rotationY) + ";" + String.valueOf(this.rotationZ);
-	    				byte [] buf = str.getBytes();
-	    				orifos.write(buf);
-	    				orifos.flush();
-	    			}
-	    			catch(Exception e) {
-	    				Log.e("Sensor", e.getMessage());
-	    			}
-    			}
-    			return;
+    			Date d = new Date();
+				String str = d.toGMTString()+":"+String.valueOf(this.rotationX) + ";" 
+						+ String.valueOf(this.rotationY) + ";" + String.valueOf(this.rotationZ)+"\n";
+				byte [] buf = str.getBytes();
+
+				for (String key: this.logOrientationmeterHashMap.keySet()) {
+					try {
+						this.logOrientationmeterHashMap.get(key).write(buf);
+						this.logOrientationmeterHashMap.get(key).flush();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
     		}
-    		
-    		if (event.sensor.getType() == Sensor.TYPE_PROXIMITY) {
+    		else if (event.sensor.getType() == Sensor.TYPE_PROXIMITY) {
+    			
     			this.proximity = event.values[0];
     			
-    			if (isLogging) {
-	    			try {
-	    				Date d = new Date();
-	    				String str = d.toGMTString()+":"+String.valueOf(this.proximity);
-	    				byte [] buf = str.getBytes();
-	    				proxfos.write(buf);
-	    				proxfos.flush();
-	    			}
-	    			catch(Exception e) {
-	    				Log.e("Sensor", e.getMessage());
-	    			}
-    			}
-    			return;
+    			Date d = new Date();
+				String str = d.toGMTString()+":"+String.valueOf(this.proximity) + "\n";
+				byte [] buf = str.getBytes();
+
+				for (String key: this.logProximitymeterHashMap.keySet()) {
+					try {
+						this.logProximitymeterHashMap.get(key).write(buf);
+						this.logProximitymeterHashMap.get(key).flush();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
     		}
-    		if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
+    		else if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
+    			
     			this.gravityX = event.values[0];
     			this.gravityY = event.values[1];
     			this.gravityZ = event.values[2];
     			
-    			if (isLogging) {
-	    			try {
-	    				Date d = new Date();
-	    				String str = d.toGMTString()+":"+String.valueOf(this.gravityX) + ";" + String.valueOf(this.gravityY) + ";" + String.valueOf(this.gravityZ);
-	    				byte [] buf = str.getBytes();
-	    				gravfos.write(buf);
-	    				gravfos.flush();
-	    			}
-	    			catch(Exception e) {
-	    				Log.e("Sensor", e.getMessage());
-	    			}
-    			}
-    			return;
+    			Date d = new Date();
+				String str = d.toGMTString()+":"+String.valueOf(this.gravityX) + ";" 
+					+ String.valueOf(this.gravityY) + ";" + String.valueOf(this.gravityZ)+"\n";
+				byte [] buf = str.getBytes();
+
+				for (String key: this.logGravitymeterHashMap.keySet()) {
+					try {
+						this.logGravitymeterHashMap.get(key).write(buf);
+						this.logGravitymeterHashMap.get(key).flush();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
     		}
     	}
     	
@@ -767,20 +915,18 @@ public class UnoService extends Service {
      * */
     
     private class SoundMeterManager extends Thread {
+    	
     	private boolean isRunning = false;
-    	private boolean isLogging = false;
-    	public double SoundPressure;
+    	private HashMap <String, FileOutputStream> logSoundmeterHashMap = new HashMap <String, FileOutputStream>();
+    	private double SoundPressure;
     	private AudioRecord mrec = null;
-    	private String senSound = "/mnt/sdcard/sensor/sound.sensor";
-    	private File f = null;
-    	private FileOutputStream fos = null;
+    	private String soundmeterBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_SOUNDMETER";
     	private int BufferSize = 0;
     	
     	public SoundMeterManager() {
     		BufferSize = 2*AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT);
     		mrec = new AudioRecord(MediaRecorder.AudioSource.MIC, 44100, AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT, BufferSize);
     		isRunning = false;
-    		isLogging = false;
     		SoundPressure = 0.0;
     	}
     	
@@ -799,33 +945,40 @@ public class UnoService extends Service {
     		isRunning = false;
     	}
     	
-    	public void startLogging() {
-    		isLogging = true;
-    		f = new File(senSound);
-    		try {
-    			if (!f.exists()) f.createNewFile();
-    		} catch (Exception e){}
+    	public void startLoggingSoundmeter(String requestor) throws IOException {
     		
-    		try {
-    			fos = new FileOutputStream(f, true);
-    		} catch (Exception e) {}
+    		File dir = new File(this.soundmeterBasePath);
+    		if (!dir.exists()) dir.mkdirs();
+    		
+    		File f = new File(this.soundmeterBasePath+"/"+requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		
+    		this.logSoundmeterHashMap.put(requestor, new FileOutputStream(f));
     	}
     	
-    	public void stopLogging() {
-    		isLogging = false;
-    		try {
-    			fos.close();
-    		} catch (Exception e) {}
+    	public void stopLogging(String requestor) throws IOException {
+    		this.logSoundmeterHashMap.get(requestor).close();
+    		this.logSoundmeterHashMap.remove(requestor);
     	}
     	
-    	private void writeLog(double value) {
-    		if (!isLogging) return;
+    	public void resetAllLogs() throws IOException {
+    		for (String key: this.logSoundmeterHashMap.keySet()) {
+    			this.logSoundmeterHashMap.get(key).close();
+    			this.logSoundmeterHashMap.remove(key);
+    		}
+    	}
+    	
+    	private void writeLog(double value) throws IOException {
+
     		Date cur = new Date();
     		String rec = cur.toGMTString()+","+String.valueOf(value)+"\n";
-    		try {
-    			fos.write(rec.getBytes());
-    			fos.flush();
-    		} catch (Exception e) {}
+    		byte [] buf = rec.getBytes();
+    		
+    		for (String key: this.logSoundmeterHashMap.keySet()) {
+    			this.logSoundmeterHashMap.get(key).write(buf);
+    			this.logSoundmeterHashMap.get(key).flush();
+    		}
     	}
     	
     	@Override
@@ -839,7 +992,12 @@ public class UnoService extends Service {
     				sum += Math.abs(tmpBuf[i]);
     			SoundPressure = 20.0*Math.log10(sum/BufferSize);
     			soundPressureValue = SoundPressure;
-    			writeLog(SoundPressure);
+    			try {
+					writeLog(SoundPressure);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
     		}
     		if (mrec != null) {
     			mrec.stop();
