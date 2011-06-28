@@ -18,8 +18,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ListActivity;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.DialogInterface.OnClickListener;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -89,7 +91,7 @@ public class UnoNetwork extends ListActivity {
 			 * */
 			if (NetworkPwd.endsWith("/Sensors")) {
 				
-				final String [] options = {"Sensor Instance", "Sensor Logging"};
+				final String [] options = {"Sensor Instance", "Sensor Logging", "Stop Logging"};
 				AlertDialog.Builder optBuilder = new AlertDialog.Builder(this);
 				optBuilder.setTitle("Actions");
 				optBuilder.setSingleChoiceItems(options, -1, new DialogInterface.OnClickListener() {
@@ -99,8 +101,11 @@ public class UnoNetwork extends ListActivity {
 						if (arg1 == 0) {
 							showSensorInstance(pos);
 						}
-						else {
+						else if (arg1 == 1){
 							// TODO Logging sensor.
+						}
+						else {
+							// TODO stop logging.
 						}
 						
 					}
@@ -124,7 +129,7 @@ public class UnoNetwork extends ListActivity {
 				    		showNetworkFileMetadata(pos);
 				    	}
 				    	else if (item == 1){
-				    		// TODO preview file.
+				    		RemoteFilePreviewProcess(pos);
 				    	}
 				    	else {
 				    		pinNetworkFile(pos);
@@ -328,6 +333,108 @@ public class UnoNetwork extends ListActivity {
 					}});
 				sensorInsBuilder.create().show();
 			}
+		}
+	}
+	
+	private void RemoteFilePreviewProcess(int pos) {
+		
+		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|FILE|PREVIEW|"+ 
+				NetworkPwdChild.get(pos).ResourceName+"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
+		if (reply == null) return;
+		if (reply.endsWith("NO_RESOURCE")) {
+			Toast.makeText(getApplicationContext(), "Metadata not availble now!", Toast.LENGTH_LONG).show();
+		}
+		else if (reply.startsWith("POST|FILE")) {
+			String [] tmp = reply.split("\\|");
+			final String resIp = tmp[2];
+			final String path = tmp[3];
+			final String id = NetworkPwdChild.get(pos).ResourceGlobalId;
+			final String previewPath = "/mnt/sdcard/Uno/Preview/"+path.substring(path.lastIndexOf("/")+1, path.length()-1)+"_"+id;
+			
+			/*
+			 * Use the following thread to retrieve file and update database.
+			 * */ 
+			new Runnable () {
+
+				public void run() {
+					try
+		        	{
+		        		InetAddress remote = InetAddress.getByName(resIp);
+		        		Socket s = new Socket(remote, 11314);
+		        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(s.getOutputStream())), true);
+		        		out.println("PREVIEW|FILE|"+path);
+
+		        		InputStream sin = s.getInputStream();
+		        		String PreviewName = path.substring(path.lastIndexOf("/")+1, path.length()-1)+"_"+id;
+		        		File PreviewDir = new File("/mnt/sdcard/Uno/Preview");
+		        		if (!PreviewDir.exists()) PreviewDir.mkdirs();
+		        		byte [] buf = new byte[s.getReceiveBufferSize()];
+		        		BufferedOutputStream bout = new BufferedOutputStream(new FileOutputStream(new File(PreviewDir, PreviewName), true)); // append.
+		        		
+		        		while (true)
+		        		{
+		        			int nbytes = sin.read(buf);
+		        			if (nbytes < 0) break;
+		        			bout.write(buf, 0, nbytes);
+		        			bout.flush();
+		        		}
+		        		bout.close();
+		        		
+		        		// Update database.
+		        		String [] row = new String[3];
+						row[0] = id;
+						row[1] = "/mnt/sdcard/Uno/Preview/"+PreviewName;
+						row[2] = PreviewName;
+						pdbh.insertRow(row);
+						
+						Toast.makeText(getApplicationContext(), "Retrieve Finished, start previewing...", Toast.LENGTH_LONG).show();
+		        	}
+		        	catch (Exception e)
+		        	{
+		        		Log.e("SocketFile", e.toString());
+		        	}
+				}
+				
+			}.run();
+			
+			// Start showing file preview
+			showPreview(previewPath);
+		}
+		
+		
+	}
+	
+	private void showPreview(String path) {
+
+		if (path.endsWith(".jpg") || path.endsWith(".png") || path.endsWith(".jpeg") || path.endsWith(".jpe") || 
+				path.endsWith(".jfif") || path.endsWith(".gif") || path.endsWith(".tif") || path.endsWith(".tiff") ||
+				path.endsWith(".bmp")) {
+			Intent intent = new Intent(UnoNetwork.this, imgPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			UnoNetwork.this.startActivity(intent);
+		}
+		else if (path.endsWith(".txt")) {
+			Intent intent = new Intent(UnoNetwork.this, txtPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			UnoNetwork.this.startActivity(intent);
+		}
+		/*else if (path.endsWith(".pdf")) {
+			Intent intent = new Intent(UnoNetwork.this, pdfPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			UnoNetwork.this.startActivity(intent);
+		}*/
+		else if (path.equals("TYPE_ACCELEROMETER") || path.equals("TYPE_GRAVITY") || path.equals("TYPE_GYROSCOPE") ||
+				path.equals("TYPE_LIGHT") || path.equals("TYPE_MAGNETIC_FIELD") || path.equals("TYPE_ORIENTATION") ||
+				path.equals("TYPE_PRESSURE") || path.equals("TYPE_PROXIMITY") || path.equals("TYPE_LINEAR_ACCELERATION") ||
+				path.equals("TYPE_ROTATION_VECTOR") || path.equals("TYPE_TEMPERATURE")) {
+			Intent intent = new Intent(UnoNetwork.this, txtPreview.class);
+			intent.putExtra("PREVIEW_PATH", path);
+			UnoNetwork.this.startActivity(intent);
+		}
+		else {
+			Toast.makeText(getApplicationContext(), "Not support this file type...", Toast.LENGTH_LONG).show();
+			Vibrator vbr = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+			vbr.vibrate(300);
 		}
 	}
 }

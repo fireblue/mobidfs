@@ -309,11 +309,11 @@ public class LocalHome extends ListActivity {
 			intent.putExtra("PREVIEW_PATH", path);
 			LocalHome.this.startActivity(intent);
 		}
-		else if (path.endsWith(".pdf")) {
+		/*else if (path.endsWith(".pdf")) {
 			Intent intent = new Intent(LocalHome.this, pdfPreview.class);
 			intent.putExtra("PREVIEW_PATH", path);
 			LocalHome.this.startActivity(intent);
-		}
+		}*/
 		else if (path.equals("TYPE_ACCELEROMETER") || path.equals("TYPE_GRAVITY") || path.equals("TYPE_GYROSCOPE") ||
 				path.equals("TYPE_LIGHT") || path.equals("TYPE_MAGNETIC_FIELD") || path.equals("TYPE_ORIENTATION") ||
 				path.equals("TYPE_PRESSURE") || path.equals("TYPE_PROXIMITY") || path.equals("TYPE_LINEAR_ACCELERATION") ||
