@@ -457,6 +457,24 @@ def parseCommand(message, clientAddr):
                         return "POST|FILE|PIN|NO_RESOURCE";
                     ip = res[0][3];
                     return "POST|FILE|"+ip+"|"+path;
+		elif argv[2] == "PREVIEW":
+                    resname = argv[3];
+                    resid = argv[4];
+                    query = "SELECT * FROM `resources` WHERE `RESOURCE_NAME`='"+resname \
+                            +"' AND `ID`='"+resid+"';";
+                    res = Database.matrixReadDB(conn, query);
+                    if len(res) == 0:
+                        return "POST|FILE|PREVIEW|NO_RESOURCE";
+                    path = res[0][4];
+                    owner = res[0][2];
+                    device = res[0][3];
+                    query = "SELECT * FROM `devices` WHERE `DEVICE_OWNER`='"+owner \
+                            +"' AND `DEVICE_NAME`='"+device+"';";
+                    res = Database.matrixReadDB(conn, query);
+                    if len(res) == 0:
+                        return "POST|FILE|PREVIEW|NO_RESOURCE";
+                    ip = res[0][3];
+                    return "POST|FILE|"+ip+"|"+path;
 
     else:
         pass;
