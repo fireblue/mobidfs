@@ -22,8 +22,18 @@ def parseCommand(message, clientAddr):
     if argc == 1:
         pass;
     elif argc == 2:
-        pass;
-    elif argc == 3:
+        if argv[0] == "GET":
+			if argv[1] == "P2P":
+				query = "SELECT * FROM `devices` WHERE `ALIVE`='1';";
+				res = Database.matrixReadDB(conn, query);
+				if len(res) == 0:
+					return "POST|P2P|";
+				ret = "POST|P2P|";
+				for row in res:
+					# owner, device, ip
+					ret += row[1]+","+row[2]+","+row[3]+";";
+				return ret;
+ elif argc == 3:
         if argv[0] == "OFFLINE":
             if argv[1] == "FILE":
                 ip = clientAddr[0];
