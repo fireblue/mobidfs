@@ -36,6 +36,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.Cursor;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -84,6 +85,8 @@ public class UnoService extends Service {
 		mSoundMgr.startMeasure();
 		
 		setupSensorsObjectFile();
+		
+		resdbh = new LocalResourceDatabaseHelper(this);
 	}
 	
 	@Override
@@ -145,6 +148,7 @@ public class UnoService extends Service {
     private String passiveProvider = LocationManager.PASSIVE_PROVIDER;
     private LocationManager mLocationMgr = null;
     
+    private LocalResourceDatabaseHelper resdbh;
 	
     /*
      * Network message parser deal with incoming request from server or peer smartphone.
@@ -215,6 +219,22 @@ public class UnoService extends Service {
 						e.printStackTrace();
 					}
 					
+				}
+			}
+		}
+		else if (argc == 4) {
+			if (argv[0].equals("GET")) {
+				if (argv[1].equals("DIR")) {
+					if (argv[2].equals("P2P")) {
+						String pwd = argv[3];
+						Cursor cur = resdbh.execQuery("SELECT * FROM "+resdbh.dbName);
+						int n = resdbh.countRow(cur);
+						for (int i = 0; i < n; i++) {
+							String [] row = resdbh.fetchOneRow(cur);
+							
+							
+						}
+					}
 				}
 			}
 		}

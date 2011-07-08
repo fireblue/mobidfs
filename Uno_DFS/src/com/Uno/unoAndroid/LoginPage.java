@@ -3,7 +3,9 @@ package com.Uno.unoAndroid;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -124,12 +126,41 @@ public class LoginPage extends Activity {
 			File dir = new File("/mnt/sdcard/Uno");
 			if (!dir.exists()) dir.mkdirs();
 			
-			File f = new File("/mnt/sdcard/Uno/sys.ini");
+			File f = new File("/mnt/sdcard/Uno/login.ini");
 			f.deleteOnExit();
 			f.createNewFile();
 			FileOutputStream fos = new FileOutputStream(f);
-			fos.write(usr.getBytes());
+			fos.write(("Owner:"+usr+"\n").getBytes());
 			fos.flush();
+			fos.write(("Device:"+android.os.Build.DEVICE).getBytes());
+			fos.flush();
+			fos.close();
+		} catch (Exception e) {}
+		
+		/*
+		 * Fetch P2P list after login.
+		 * */
+		fetchP2pList();
+    }
+    
+    private void fetchP2pList() {
+    	String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|P2P");
+    	if (reply == null) {
+    		Toast.makeText(getApplicationContext(), "Fetch P2P List Failed...", Toast.LENGTH_LONG).show();
+    		return;
+    	}
+    	String [] p2pList = reply.split("\\|")[2].split(";");
+    	File f = new File("/mnt/sdcard/Uno/p2p.ini");
+    	f.deleteOnExit();
+    	try {
+			f.createNewFile();
+		} catch (IOException e) {}
+		try {
+			FileOutputStream fos = new FileOutputStream(f);
+			for (String str: p2pList) {
+				fos.write((str+"\n").getBytes());
+				fos.flush();
+			}
 			fos.close();
 		} catch (Exception e) {}
     }
