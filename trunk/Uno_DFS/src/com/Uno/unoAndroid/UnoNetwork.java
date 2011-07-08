@@ -4,7 +4,10 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -36,10 +39,16 @@ public class UnoNetwork extends ListActivity {
 	private ArrayList <String> NetworkPwdChildString;
 	private final String GOVERNOR_IP = "com1379.eecs.utk.edu";
 	private ArrayAdapter <String> adapter;
-	private final PinDatabaseHelper pdbh = new PinDatabaseHelper(this);
+	private PinDatabaseHelper pdbh = null;
+	
+	private String Owner = null;
+	private String Device = null;
 	
 	public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        pdbh = new PinDatabaseHelper(this);
+        initLoginInfo();
         
         NetworkPwdChildString = new ArrayList <String>();
         NetworkPwdChild = fetchPwdChildList(NetworkPwd);
@@ -148,6 +157,20 @@ public class UnoNetwork extends ListActivity {
 		}
 	}
 	
+	private void initLoginInfo() {
+		FileInputStream fin = null;
+		try {
+			fin = new FileInputStream("/mnt/sdcard/Uno/login.ini");
+		} catch (FileNotFoundException e) {}
+		BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+		try {
+			Owner = br.readLine().split(":")[1];
+			Device = br.readLine().split(":")[1];
+			br.close();
+			fin.close();
+		} catch (IOException e) {}
+	}
+	
 	/*
 	 * Given a pwd and fetch all children inside this directory.
 	 * */
@@ -163,7 +186,85 @@ public class UnoNetwork extends ListActivity {
         p.ResourceGlobalId = "-1";
         pwdchild.add(p);
         
-        if (reply == null || reply.endsWith("NO_RESOURCE")) {
+        /*
+         * Central server failed...needs to go P2P.
+         * */
+        if (reply == null) {
+        	File f = new File("/mnt/sdcard/Uno/p2p.ini");
+        	if (!f.exists()) {
+        		Toast.makeText(getApplicationContext(), "System failure...", Toast.LENGTH_LONG).show();
+        		return pwdchild;
+        	}
+        	FileInputStream fin = null;
+			try {
+				fin = new FileInputStream(f);
+			} catch (FileNotFoundException e) {}
+        	BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+        	
+        	String line = "";
+        	
+        	try {
+				while ((line = br.readLine()) != null) {
+					String [] meta = line.split(",");
+					// In the network root directory.
+					if (pwd.equals("/")) {
+						String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+pwd);
+						
+						if (response == null) continue;
+						if (response.startsWith("POST|DIR|P2P|")) {
+							String [] tlist = response.split("\\|")[3].split(";");
+							for (String s: tlist) {
+								String [] t = s.split("\\^");
+								NetworkItem ni = new NetworkItem();
+								ni.ResourceName = t[0];
+								ni.ResourceGlobalId = "-1"; // Directory's global ID is -1.
+								pwdchild.add(ni);
+							}
+						}
+					}
+					else if (pwd.split("\\|").length == 2) {
+						if (pwd.split("\\|")[1].equals(meta[0])) {
+							String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+pwd);
+							
+							if (response == null) continue;
+							if (response.startsWith("POST|DIR|P2P|")) {
+								String [] tlist = response.split("\\|")[3].split(";");
+								for (String s: tlist) {
+									String [] t = s.split("\\^");
+									NetworkItem ni = new NetworkItem();
+									ni.ResourceName = t[0];
+									ni.ResourceGlobalId = "-1"; // Directory's global ID is -1.
+									pwdchild.add(ni);
+								}
+							}
+						}
+					}
+					else {
+						if (pwd.split("\\|")[1].equals(meta[0]) && pwd.split("\\|")[2].equals(meta[1])) {
+							String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+pwd);
+							
+							if (response == null) continue;
+							if (response.startsWith("POST|DIR|P2P|")) {
+								String [] tlist = response.split("\\|")[3].split(";");
+								for (String s: tlist) {
+									String [] t = s.split("\\^");
+									NetworkItem ni = new NetworkItem();
+									ni.ResourceName = t[0];
+									ni.ResourceGlobalId = "-1"; // Directory's global ID is -1.
+									pwdchild.add(ni);
+								}
+							}
+						}
+					}
+				}
+			} catch (IOException e) {}
+			
+			return pwdchild;
+        }
+        
+        // -----------------------Common Case----------------------------------
+        
+        if (reply.endsWith("NO_RESOURCE")) {
         	Toast.makeText(getApplicationContext(), "No resource available now.", Toast.LENGTH_LONG).show();
         	return pwdchild;
         }

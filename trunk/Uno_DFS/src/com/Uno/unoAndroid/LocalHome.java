@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -23,6 +25,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.Cursor;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.util.Log;
@@ -48,6 +51,10 @@ public class LocalHome extends ListActivity {
 	private ArrayList <File> pwdChild = new ArrayList <File> ();
 	private ProgressDialog pgDialog;
 	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
+	private LocalResourceDatabaseHelper resdbh = null;
+	
+	private String Owner = null;
+	private String Device = null;
 	
 	private void GovernorMessageParser(String msg) {
 		String [] argv = msg.split("\\|");
@@ -91,6 +98,9 @@ public class LocalHome extends ListActivity {
 	public void onCreate(Bundle icicle) {
 		super.onCreate(icicle);
 		
+		resdbh = new LocalResourceDatabaseHelper(this);
+		initLoginInfo();
+				
 		pwdChild.clear();
 		pwdChildString.clear();
 		
@@ -185,6 +195,20 @@ public class LocalHome extends ListActivity {
 		}
 	}
 	
+	private void initLoginInfo() {
+		FileInputStream fin = null;
+		try {
+			fin = new FileInputStream("/mnt/sdcard/Uno/login.ini");
+		} catch (FileNotFoundException e) {}
+		BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+		try {
+			Owner = br.readLine().split(":")[1];
+			Device = br.readLine().split(":")[1];
+			br.close();
+			fin.close();
+		} catch (IOException e) {}
+	}
+	
 	private void showFileMetadata(String path) {
 		String [] meta = getLocalFileMetadata(path);
 		final String [] attr = new String[5];
@@ -229,11 +253,42 @@ public class LocalHome extends ListActivity {
 		    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "SETPUBLIC|FILE|"+filepath+"|"+metadata);
 		    		if (reply == null) return;
 		    		GovernorMessageParser(reply);
+		    		
+		    		/*
+		    		 * Update Local Database here.
+		    		 * */
+		    		Cursor c = resdbh.execQuery("SELECT * FROM "+resdbh.dbName+" WHERE "+resdbh.colResourcePath+"='"+filepath+"'");
+		    		int n = resdbh.countRow(c);
+		    		
+		    		if (n == 0) {
+			    		String [] row = new String[6];
+			    		row[0] = Owner;
+			    		row[1] = Device;
+			    		row[2] = filepath.substring(filepath.lastIndexOf("/")+1, filepath.length());
+			    		row[3] = filepath;
+			    		row[4] = "1";
+			    		row[5] = metadata;
+			    		resdbh.insertRow(row);
+		    		}
+		    		else {
+		    			String [] row = resdbh.fetchOneRow(c);
+		    			row[1] = Owner;
+			    		row[2] = Device;
+			    		row[3] = filepath.substring(filepath.lastIndexOf("/")+1, filepath.length());
+			    		row[4] = filepath;
+			    		row[5] = "1";
+			    		row[6] = metadata;
+		    			resdbh.updateRow(row);
+		    		}
 		    	}
 		    	else if (item == 1) {
 		    		pgDialog = ProgressDialog.show(LocalHome.this, "", "Synchronizing to Server. Please wait...", true);
 		    		pgDialog.show();
 		    		showAccessList(filepath);
+		    		
+		    		/*
+		    		 * Local Database handled in the showAccessList().
+		    		 * */
 		    	}
 		    	else {
 		    		pgDialog = ProgressDialog.show(LocalHome.this, "", "Synchronizing to Server. Please wait...", true);
@@ -241,6 +296,33 @@ public class LocalHome extends ListActivity {
 		    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "OFFLINE|FILE|"+filepath);
 		    		if (reply == null) return;
 		    		GovernorMessageParser(reply);
+		    		
+		    		/*
+		    		 * Update Local Database here.
+		    		 * */
+		    		Cursor c = resdbh.execQuery("SELECT * FROM "+resdbh.dbName+" WHERE "+resdbh.colResourcePath+"='"+filepath+"'");
+		    		int n = resdbh.countRow(c);
+		    		
+		    		if (n == 0) {
+			    		String [] row = new String[6];
+			    		row[0] = Owner;
+			    		row[1] = Device;
+			    		row[2] = filepath.substring(filepath.lastIndexOf("/")+1, filepath.length());
+			    		row[3] = filepath;
+			    		row[4] = "0";
+			    		row[5] = "";
+			    		resdbh.insertRow(row);
+		    		}
+		    		else {
+		    			String [] row = resdbh.fetchOneRow(c);
+		    			row[1] = Owner;
+			    		row[2] = Device;
+			    		row[3] = filepath.substring(filepath.lastIndexOf("/")+1, filepath.length());
+			    		row[4] = filepath;
+			    		row[5] = "0";
+			    		row[6] = "";
+		    			resdbh.updateRow(row);
+		    		}
 		    	}
 		    }
 		});
@@ -285,6 +367,33 @@ public class LocalHome extends ListActivity {
 	    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "SETPRIVATE|FILE|"+filepath+"|"+metadata+"|"+accesslist);
 	    		if (reply == null) return;
 	    		GovernorMessageParser(reply);
+	    		
+	    		/*
+	    		 * Update Local Database here.
+	    		 * */
+	    		Cursor c = resdbh.execQuery("SELECT * FROM "+resdbh.dbName+" WHERE "+resdbh.colResourcePath+"='"+filepath+"'");
+	    		int n = resdbh.countRow(c);
+	    		
+	    		if (n == 0) {
+		    		String [] row = new String[6];
+		    		row[0] = Owner;
+		    		row[1] = Device;
+		    		row[2] = filepath.substring(filepath.lastIndexOf("/")+1, filepath.length());
+		    		row[3] = filepath;
+		    		row[4] = accesslist;
+		    		row[5] = metadata;
+		    		resdbh.insertRow(row);
+	    		}
+	    		else {
+	    			String [] row = resdbh.fetchOneRow(c);
+	    			row[1] = Owner;
+		    		row[2] = Device;
+		    		row[3] = filepath.substring(filepath.lastIndexOf("/")+1, filepath.length());
+		    		row[4] = filepath;
+		    		row[5] = accesslist;
+		    		row[6] = metadata;
+	    			resdbh.updateRow(row);
+	    		}
 			}});
 		btCancel.setOnClickListener(new OnClickListener () {
 

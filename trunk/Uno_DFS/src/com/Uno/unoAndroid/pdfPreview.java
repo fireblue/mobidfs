@@ -9,7 +9,7 @@ import java.io.InputStream;
 import android.app.Activity;
 import android.os.Bundle;
 import android.widget.TextView;
-
+/*
 import org.apache.pdfbox.cos.COSDocument;
 import org.apache.pdfbox.pdfparser.PDFParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -29,7 +29,6 @@ public class pdfPreview extends Activity {
 	private String text = null;
 	private int numberOfPages = 0;
 	
-	/** Called when the activity is first created. */
 	public void onCreate(Bundle icicle) {
 		super.onCreate(icicle);
 		
@@ -62,3 +61,4 @@ public class pdfPreview extends Activity {
 		
 	}
 }
+*/

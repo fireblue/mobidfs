@@ -3,7 +3,10 @@ package com.Uno.unoAndroid;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -23,6 +26,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -53,11 +57,18 @@ public class LocalSensor extends ListActivity {
 	private CommonSensorManager mComSensorMgr;
 	private HashMap <String, String> SENSOR_NAME_MAP;
 	
+	private LocalResourceDatabaseHelper resdbh = null;
+	private String Owner = null;
+	private String Device = null;
+	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.localsensor);
-        SENSOR_NAME_MAP = new HashMap();
+        
+        resdbh = new LocalResourceDatabaseHelper(this);
+        initLoginInfo();
+        
         valuelist = initSensorList();
         adapter = new SensorAdapter(LocalSensor.this, valuelist);
         setListAdapter(adapter);
@@ -93,6 +104,34 @@ public class LocalSensor extends ListActivity {
 		    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "SETPUBLIC|SENSOR|"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName));
 		    		if (reply == null) return;
 		    		GovernorMessageParser(reply);
+		    		
+		    		/*
+		    		 * Update Local Database here.
+		    		 * */
+		    		Cursor c = resdbh.execQuery("SELECT * FROM "+resdbh.dbName+" WHERE "+resdbh.colResourcePath+"='"+
+		    				"/mnt/sdcard/Sensors/"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName)+"'");
+		    		int n = resdbh.countRow(c);
+		    		
+		    		if (n == 0) {
+			    		String [] row = new String[6];
+			    		row[0] = Owner;
+			    		row[1] = Device;
+			    		row[2] = SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[3] = "/mnt/sdcard/Sensors/"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[4] = "1";
+			    		row[5] = "";
+			    		resdbh.insertRow(row);
+		    		}
+		    		else {
+		    			String [] row = resdbh.fetchOneRow(c);
+		    			row[1] = Owner;
+			    		row[2] = Device;
+			    		row[3] = SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[4] = "/mnt/sdcard/Sensors/"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[5] = "1";
+			    		row[6] = "";
+		    			resdbh.updateRow(row);
+		    		}
 		    	}
 		    	else if (item == 1) {
 		    		pgDialog = ProgressDialog.show(LocalSensor.this, "", "Synchronizing to Server. Please wait...", true);
@@ -105,6 +144,34 @@ public class LocalSensor extends ListActivity {
 		    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "OFFLINE|SENSOR|"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName));
 		    		if (reply == null) return;
 		    		GovernorMessageParser(reply);
+		    		
+		    		/*
+		    		 * Update Local Database here.
+		    		 * */
+		    		Cursor c = resdbh.execQuery("SELECT * FROM "+resdbh.dbName+" WHERE "+resdbh.colResourcePath+"='"+
+		    				"/mnt/sdcard/Sensors/"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName)+"'");
+		    		int n = resdbh.countRow(c);
+		    		
+		    		if (n == 0) {
+			    		String [] row = new String[6];
+			    		row[0] = Owner;
+			    		row[1] = Device;
+			    		row[2] = SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[3] = "/mnt/sdcard/Sensors/"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[4] = "0";
+			    		row[5] = "";
+			    		resdbh.insertRow(row);
+		    		}
+		    		else {
+		    			String [] row = resdbh.fetchOneRow(c);
+		    			row[1] = Owner;
+			    		row[2] = Device;
+			    		row[3] = SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[4] = "/mnt/sdcard/Sensors/"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName);
+			    		row[5] = "0";
+			    		row[6] = "";
+		    			resdbh.updateRow(row);
+		    		}
 		    	}
 		    }
 		});
@@ -114,6 +181,20 @@ public class LocalSensor extends ListActivity {
 	           }
 	    });
 		optBuilder.create().show();
+	}
+	
+	private void initLoginInfo() {
+		FileInputStream fin = null;
+		try {
+			fin = new FileInputStream("/mnt/sdcard/Uno/login.ini");
+		} catch (FileNotFoundException e) {}
+		BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+		try {
+			Owner = br.readLine().split(":")[1];
+			Device = br.readLine().split(":")[1];
+			br.close();
+			fin.close();
+		} catch (IOException e) {}
 	}
 	
 	private void showAccessList(String sensor) {
@@ -142,6 +223,34 @@ public class LocalSensor extends ListActivity {
 	    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "SETPRIVATE|SENSOR|"+xsensor+"|"+accesslist);
 	    		if (reply == null) return;
 	    		GovernorMessageParser(reply);
+	    		
+	    		/*
+	    		 * Update Local Database here.
+	    		 * */
+	    		Cursor c = resdbh.execQuery("SELECT * FROM "+resdbh.dbName+" WHERE "+resdbh.colResourcePath+"='"+
+	    				"/mnt/sdcard/Sensors/"+xsensor+"'");
+	    		int n = resdbh.countRow(c);
+	    		
+	    		if (n == 0) {
+		    		String [] row = new String[6];
+		    		row[0] = Owner;
+		    		row[1] = Device;
+		    		row[2] = xsensor;
+		    		row[3] = "/mnt/sdcard/Sensors/"+xsensor;
+		    		row[4] = "0";
+		    		row[5] = "";
+		    		resdbh.insertRow(row);
+	    		}
+	    		else {
+	    			String [] row = resdbh.fetchOneRow(c);
+	    			row[1] = Owner;
+		    		row[2] = Device;
+		    		row[3] = xsensor;
+		    		row[4] = "/mnt/sdcard/Sensors/"+xsensor;
+		    		row[5] = "0";
+		    		row[6] = "";
+	    			resdbh.updateRow(row);
+	    		}
 			}});
 		btCancel.setOnClickListener(new OnClickListener () {
 
