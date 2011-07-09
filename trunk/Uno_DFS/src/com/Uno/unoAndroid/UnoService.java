@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 
 import android.app.NotificationManager;
@@ -223,17 +224,61 @@ public class UnoService extends Service {
 			}
 		}
 		else if (argc == 4) {
+			
+		}
+		else if (argc == 5) {
 			if (argv[0].equals("GET")) {
 				if (argv[1].equals("DIR")) {
 					if (argv[2].equals("P2P")) {
-						String pwd = argv[3];
+						String [] xdir = argv[4].split("/");
+						int nxdir = xdir.length;
+						
 						Cursor cur = resdbh.execQuery("SELECT * FROM "+resdbh.dbName);
 						int n = resdbh.countRow(cur);
+						if (n == 0) {
+							try {
+								DataOutputStream out = new DataOutputStream(client.getOutputStream());
+								out.write(("POST|DIR|P2P|").getBytes());
+							} catch (IOException e) {}
+						}
+						
+						HashSet <String> pool = new HashSet <String>();
+						
 						for (int i = 0; i < n; i++) {
 							String [] row = resdbh.fetchOneRow(cur);
+							String [] acc = row[5].split("&");
+							boolean legal = false;
+							for (String s: acc) {
+								if (s.equals(argv[3])) {
+									legal = true;
+									break;
+								}
+							}
+							if (!legal) continue;
+							String [] xrdir = row[4].split("/");
+							int nxrdir = xrdir.length;
 							
-							
+							if (nxrdir <= nxdir) continue;
+							else if (nxrdir - 1 == nxdir) {
+								if (!pool.contains(xrdir[nxdir]))
+									pool.add(xrdir[nxdir]);
+							}
+							else {
+								if (!pool.contains(xrdir[nxdir]+"/"))
+									pool.add(xrdir[nxdir]+"/"); 
+							}
 						}
+						
+						String replyMsg = "POST|DIR|P2P|";
+						for (String s: pool) {
+							replyMsg += s+"^-1;";
+						}
+						
+						try {
+							DataOutputStream out = new DataOutputStream(client.getOutputStream());
+							out.write(replyMsg.getBytes());
+						} catch (IOException e) {}
+						
 					}
 				}
 			}
