@@ -37,6 +37,7 @@ public final class R {
         public static final int login_pwd=0x7f06000c;
         public static final int login_reg=0x7f06000f;
         public static final int login_username=0x7f060009;
+        public static final int pdfPreview=0x7f060010;
         public static final int register_confirm=0x7f060018;
         public static final int register_ok=0x7f06001a;
         public static final int register_password=0x7f060015;
@@ -50,8 +51,8 @@ public final class R {
         public static final int sensorZ=0x7f060025;
         public static final int textView1=0x7f060002;
         public static final int textView2=0x7f06000b;
-        public static final int txtPreview=0x7f060010;
-        public static final int unonetworkList=0x7f060027;
+        public static final int txtPreview=0x7f060027;
+        public static final int unonetworkList=0x7f060028;
         public static final int valueX=0x7f060022;
         public static final int valueY=0x7f060024;
         public static final int valueZ=0x7f060026;

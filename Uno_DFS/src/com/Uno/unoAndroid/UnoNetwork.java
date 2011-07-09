@@ -97,6 +97,7 @@ public class UnoNetwork extends ListActivity {
 			/*
 			 * Two cases here: sensor file and common file
 			 * Sensor file use sensor ID.
+			 * 
 			 * */
 			if (NetworkPwd.endsWith("/Sensors")) {
 				
@@ -188,6 +189,7 @@ public class UnoNetwork extends ListActivity {
         
         /*
          * Central server failed...needs to go P2P.
+         * --------------------------------------------------------------------
          * */
         if (reply == null) {
         	File f = new File("/mnt/sdcard/Uno/p2p.ini");
@@ -208,40 +210,21 @@ public class UnoNetwork extends ListActivity {
 					String [] meta = line.split(",");
 					// In the network root directory.
 					if (pwd.equals("/")) {
-						String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+pwd);
-						
-						if (response == null) continue;
-						if (response.startsWith("POST|DIR|P2P|")) {
-							String [] tlist = response.split("\\|")[3].split(";");
-							for (String s: tlist) {
-								String [] t = s.split("\\^");
-								NetworkItem ni = new NetworkItem();
-								ni.ResourceName = t[0];
-								ni.ResourceGlobalId = "-1"; // Directory's global ID is -1.
-								pwdchild.add(ni);
-							}
-						}
+						NetworkItem ni = new NetworkItem();
+						ni.ResourceGlobalId = "-1";
+						ni.ResourceName = meta[1];
+						pwdchild.add(ni);
 					}
 					else if (pwd.split("\\|").length == 2) {
-						if (pwd.split("\\|")[1].equals(meta[0])) {
-							String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+pwd);
-							
-							if (response == null) continue;
-							if (response.startsWith("POST|DIR|P2P|")) {
-								String [] tlist = response.split("\\|")[3].split(";");
-								for (String s: tlist) {
-									String [] t = s.split("\\^");
-									NetworkItem ni = new NetworkItem();
-									ni.ResourceName = t[0];
-									ni.ResourceGlobalId = "-1"; // Directory's global ID is -1.
-									pwdchild.add(ni);
-								}
-							}
-						}
+						NetworkItem ni = new NetworkItem();
+						ni.ResourceGlobalId = "-1";
+						ni.ResourceName = meta[2];
+						if (!pwdchild.contains(ni))
+							pwdchild.add(ni);
 					}
 					else {
 						if (pwd.split("\\|")[1].equals(meta[0]) && pwd.split("\\|")[2].equals(meta[1])) {
-							String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+pwd);
+							String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+Owner+"|"+pwd);
 							
 							if (response == null) continue;
 							if (response.startsWith("POST|DIR|P2P|")) {
