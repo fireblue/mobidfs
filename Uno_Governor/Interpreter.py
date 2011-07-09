@@ -7,9 +7,8 @@ def parseCommand(message, clientAddr):
     #return "***Welcome***\nNow server is under construction.\n\nPlease contact jliao2@utk.edu for more information";
     argv = message.split("|");
     argc = len(argv);
-
-    conn = Database.openDB("localhost", "unodev", "11235813", "unodata");
     
+    conn = Database.openDB("localhost", "unodev", "11235813", "unodata");
     #-----------------------check wrong command------------------------
     reload(GlobalVariables);
     if argv[0] not in GlobalVariables.CommandSet:
@@ -23,17 +22,17 @@ def parseCommand(message, clientAddr):
         pass;
     elif argc == 2:
         if argv[0] == "GET":
-			if argv[1] == "P2P":
-				query = "SELECT * FROM `devices` WHERE `ALIVE`='1';";
-				res = Database.matrixReadDB(conn, query);
-				if len(res) == 0:
-					return "POST|P2P|";
-				ret = "POST|P2P|";
-				for row in res:
-					# owner, device, ip
-					ret += row[1]+","+row[2]+","+row[3]+";";
-				return ret;
- elif argc == 3:
+            if argv[1] == "P2P":
+                query = "SELECT * FROM `devices` WHERE `ALIVE`='1';";
+                res = Database.matrixReadDB(conn, query);
+                if len(res) == 0:
+                    return "POST|P2P|";
+                ret = "POST|P2P|";
+                for row in res:
+                    # owner, device, ip
+                    ret += row[1]+","+row[2]+","+row[3]+";";
+                return ret;
+    elif argc == 3:
         if argv[0] == "OFFLINE":
             if argv[1] == "FILE":
                 ip = clientAddr[0];
