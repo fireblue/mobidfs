@@ -50,7 +50,7 @@ public class LocalHome extends ListActivity {
 	private ArrayList <String> pwdChildString = new ArrayList <String> ();
 	private ArrayList <File> pwdChild = new ArrayList <File> ();
 	private ProgressDialog pgDialog;
-	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
+	private static String GOVERNOR_IP = UnoConstant.GOVERNOR_ADDRESS;
 	private LocalResourceDatabaseHelper resdbh = null;
 	
 	private String Owner = null;
