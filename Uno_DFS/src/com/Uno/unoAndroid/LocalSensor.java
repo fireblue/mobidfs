@@ -50,7 +50,7 @@ import android.widget.Toast;
 
 public class LocalSensor extends ListActivity {
 	
-	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
+	private static String GOVERNOR_IP = UnoConstant.GOVERNOR_ADDRESS;
 	private List <SensorValues> valuelist;
 	private SensorAdapter adapter;
 	private ProgressDialog pgDialog;
@@ -66,6 +66,7 @@ public class LocalSensor extends ListActivity {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.localsensor);
         
+        SENSOR_NAME_MAP = new HashMap <String, String>();
         resdbh = new LocalResourceDatabaseHelper(this);
         initLoginInfo();
         
@@ -73,7 +74,7 @@ public class LocalSensor extends ListActivity {
         adapter = new SensorAdapter(LocalSensor.this, valuelist);
         setListAdapter(adapter);
         mComSensorMgr = new CommonSensorManager();
-        mComSensorMgr.startSensor();
+        //mComSensorMgr.startSensor();
     }
 	
 	@Override

@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -38,7 +39,7 @@ public class LoginPage extends Activity {
 	private EditText passwordEditText = null;
 	private Button loginButton = null;
 	private Button registerButton = null;
-	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
+	private static String GOVERNOR_IP = UnoConstant.GOVERNOR_ADDRESS;
 	private final Context mCtx = this;
 	
 	private ProgressDialog pgDialog;
@@ -48,8 +49,6 @@ public class LoginPage extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login);
-        
-        startService(new Intent(getApplicationContext(), UnoService.class));
         
         usernameEditText = (EditText) findViewById(R.id.login_username);
         passwordEditText = (EditText) findViewById(R.id.login_pwd);
@@ -129,12 +128,13 @@ public class LoginPage extends Activity {
 			File f = new File("/mnt/sdcard/Uno/login.ini");
 			f.deleteOnExit();
 			f.createNewFile();
-			FileOutputStream fos = new FileOutputStream(f);
-			fos.write(("Owner:"+usr+"\n").getBytes());
-			fos.flush();
-			fos.write(("Device:"+android.os.Build.DEVICE).getBytes());
-			fos.flush();
-			fos.close();
+			BufferedWriter bw = new BufferedWriter(new FileWriter(f));
+			bw.write("Owner:"+usr);
+			bw.newLine();
+			bw.write("Device:"+android.os.Build.DEVICE);
+			bw.newLine();
+			bw.flush();
+			bw.close();
 		} catch (Exception e) {}
 		
 		/*
@@ -156,12 +156,13 @@ public class LoginPage extends Activity {
 			f.createNewFile();
 		} catch (IOException e) {}
 		try {
-			FileOutputStream fos = new FileOutputStream(f);
+			BufferedWriter bw = new BufferedWriter(new FileWriter(f));
 			for (String str: p2pList) {
-				fos.write((str+"\n").getBytes());
-				fos.flush();
+				bw.write(str);
+				bw.newLine();
+				bw.flush();
 			}
-			fos.close();
+			bw.close();
 		} catch (Exception e) {}
     }
     

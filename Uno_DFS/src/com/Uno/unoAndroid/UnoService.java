@@ -82,8 +82,8 @@ public class UnoService extends Service {
 		
 		tcplist.start();
 
-		mComSensorMgr.startSensor();
-		mSoundMgr.startMeasure();
+		//mComSensorMgr.startSensor();
+		//mSoundMgr.startMeasure();
 		
 		setupSensorsObjectFile();
 		
@@ -131,7 +131,7 @@ public class UnoService extends Service {
 	 * */
 
 	private final Context mCtx = this;
-	private static String GOVERNOR_IP = "com1379.eecs.utk.edu";
+	private static String GOVERNOR_IP = UnoConstant.GOVERNOR_ADDRESS;
 	private static String DEVICE_LOCAL_LISTEN_IP = null;
 	private ServerSocket tcpServer = null;
 	private TCPListenThread tcplist = null;
@@ -239,23 +239,32 @@ public class UnoService extends Service {
 							try {
 								DataOutputStream out = new DataOutputStream(client.getOutputStream());
 								out.write(("POST|DIR|P2P|").getBytes());
+								out.close();
+								return;
 							} catch (IOException e) {}
 						}
 						
 						HashSet <String> pool = new HashSet <String>();
 						
+						cur.moveToFirst();
 						for (int i = 0; i < n; i++) {
 							String [] row = resdbh.fetchOneRow(cur);
 							String [] acc = row[5].split("&");
 							boolean legal = false;
-							for (String s: acc) {
-								if (s.equals(argv[3])) {
-									legal = true;
-									break;
+							
+							if (row[5].equals("1")) legal = true;
+							else if (row[5].equals("0")) legal = false;
+							else {
+								for (String s: acc) {
+									if (s.equals(argv[3])) {
+										legal = true;
+										break;
+									}
 								}
 							}
+
 							if (!legal) continue;
-							String [] xrdir = row[4].split("/");
+							String [] xrdir = ("/A/B"+row[4]).split("/");
 							int nxrdir = xrdir.length;
 							
 							if (nxrdir <= nxdir) continue;

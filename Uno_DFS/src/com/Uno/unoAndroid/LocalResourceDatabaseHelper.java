@@ -10,7 +10,7 @@ import android.util.Log;
 public class LocalResourceDatabaseHelper extends SQLiteOpenHelper {
 
 	static final String dbName = "RESOURCE_DB";
-	static final String colID = "ID";
+	static final String colID = "RESOURCE_ID";
 	static final String colOwner = "RESOURCE_OWNER";
 	static final String colDevice = "RESOURCE_DEVICE";
 	static final String colResourceName = "RESOURCE_NAME";

@@ -37,7 +37,7 @@ public class UnoNetwork extends ListActivity {
 	private String NetworkPwd = "/";
 	private ArrayList <NetworkItem> NetworkPwdChild;
 	private ArrayList <String> NetworkPwdChildString;
-	private final String GOVERNOR_IP = "com1379.eecs.utk.edu";
+	private final String GOVERNOR_IP = UnoConstant.GOVERNOR_ADDRESS;
 	private ArrayAdapter <String> adapter;
 	private PinDatabaseHelper pdbh = null;
 	
@@ -206,43 +206,59 @@ public class UnoNetwork extends ListActivity {
         	String line = "";
         	
         	try {
-				while ((line = br.readLine()) != null) {
-					String [] meta = line.split(",");
-					// In the network root directory.
-					if (pwd.equals("/")) {
+				
+				// In the network root directory.
+				if (NetworkPwd.equals("/")) {
+					while ((line = br.readLine()) != null) {
+						String [] meta = line.split(",");
 						NetworkItem ni = new NetworkItem();
 						ni.ResourceGlobalId = "-1";
-						ni.ResourceName = meta[1];
+						ni.ResourceName = meta[0]+"/";
 						pwdchild.add(ni);
 					}
-					else if (pwd.split("\\|").length == 2) {
+					br.close();
+					return pwdchild;
+				}
+				else if (NetworkPwd.split("/").length == 2) {
+					while ((line = br.readLine()) != null) {
+						String [] meta = line.split(",");
+						
+						if (!meta[0].equals(NetworkPwd.split("/")[1])) continue;
+						
 						NetworkItem ni = new NetworkItem();
 						ni.ResourceGlobalId = "-1";
-						ni.ResourceName = meta[2];
-						if (!pwdchild.contains(ni))
-							pwdchild.add(ni);
+						ni.ResourceName = meta[1]+"/";
+						pwdchild.add(ni);
 					}
-					else {
-						if (pwd.split("\\|")[1].equals(meta[0]) && pwd.split("\\|")[2].equals(meta[1])) {
-							String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+Owner+"|"+pwd);
+					br.close();
+					return pwdchild;
+				}
+				else {
+					while ((line = br.readLine()) != null) {
+						String [] meta = line.split(",");
+						
+						if (!pwd.split("/")[1].equals(meta[0]) || !pwd.split("/")[2].equals(meta[1])) continue;
+						
+						String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+Owner+"|"+pwd);
 							
-							if (response == null) continue;
-							if (response.startsWith("POST|DIR|P2P|")) {
-								String [] tlist = response.split("\\|")[3].split(";");
-								for (String s: tlist) {
-									String [] t = s.split("\\^");
-									NetworkItem ni = new NetworkItem();
-									ni.ResourceName = t[0];
-									ni.ResourceGlobalId = "-1"; // Directory's global ID is -1.
-									pwdchild.add(ni);
-								}
+						if (response == null) continue;
+						if (response.equals("POST|DIR|P2P|")) continue;
+						if (response.startsWith("POST|DIR|P2P|")) {
+							String [] tlist = response.split("\\|")[3].split(";");
+							for (String s: tlist) {
+								String [] t = s.split("\\^");
+								NetworkItem ni = new NetworkItem();
+								ni.ResourceName = t[0];
+								ni.ResourceGlobalId = "-1"; // Directory's global ID is -1.
+								pwdchild.add(ni);
 							}
 						}
 					}
+					br.close();
+					return pwdchild;
 				}
 			} catch (IOException e) {}
 			
-			return pwdchild;
         }
         
         // -----------------------Common Case----------------------------------
@@ -255,6 +271,8 @@ public class UnoNetwork extends ListActivity {
         	Toast.makeText(getApplicationContext(), "Access denied.", Toast.LENGTH_LONG).show();
         	return pwdchild;
         }
+        
+        if (reply.equals("POST|DIR|")) return pwdchild;
         
         if (reply.startsWith("POST|DIR|")) {
         	String [] argv = reply.split("\\|");
@@ -394,7 +412,9 @@ public class UnoNetwork extends ListActivity {
 			/*
 			 * First go to target mobile device to get sensor values.
 			 * */
-			String response = sendTcpPacket(reply.split("\\|")[2], 11314, "GET|SENSOR|"+NetworkPwdChild.get(pos).ResourceName);
+			String targetIp = reply.split("\\|")[2];
+			String msg = "GET|SENSOR|"+NetworkPwdChild.get(pos).ResourceName;
+			String response = sendTcpPacket(targetIp, 11314, msg);
 			if (response == null) return;
 			
 			if (response.startsWith("POST|SENSOR|")) {
