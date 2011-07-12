@@ -669,7 +669,98 @@ public class UnoNetwork extends ListActivity {
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|FILE|PREVIEW|"+ 
 				NetworkPwdChild.get(pos).ResourceName+"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
 		
-		if (reply == null) return;
+		/*
+		 * Here is the P2P part for File Preview.
+		 * ----------------------------------------------------------------
+		 * */		
+		if (reply == null) {
+			String path = NetworkPwd + "/" +NetworkPwdChild.get(pos).ResourceName;
+			String [] tpath = path.split("/");
+			String [] xpath = new String[tpath.length-2];
+			for (int i = 0, k = 0; i < tpath.length; i++) {
+				if (i == 1 || i == 2) continue;
+				xpath[k++] = tpath[i];
+			}
+			
+			File f = new File("/mnt/sdcard/Uno/p2p.ini");
+        	if (!f.exists()) {
+        		Toast.makeText(getApplicationContext(), "System failure...", Toast.LENGTH_LONG).show();
+        		return;
+        	}
+        	FileInputStream fin = null;
+			try {
+				fin = new FileInputStream(f);
+			} catch (FileNotFoundException e) {}
+        	BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+        	
+        	String line = "";
+        	
+        	try {
+				while ((line = br.readLine()) != null) {
+					String [] t = line.split(",");
+					if (!t[0].equals(tpath[1]) || !t[1].equals(tpath[2])) continue;
+					
+					String remotePath = "";
+					for (int i = 0; i < xpath.length; i++) {
+						remotePath += xpath[i] + "/";
+					}
+					
+					final String targetIp = t[2];
+					final String targetPath = remotePath.substring(0, remotePath.length()-1);
+					final String previewPath = "/mnt/sdcard/Uno/Preview/"+targetPath.substring(targetPath.lastIndexOf("/")+1, targetPath.length())+"_p2p";
+					
+					new Runnable () {
+
+						public void run() {
+							try
+				        	{
+				        		InetAddress remote = InetAddress.getByName(targetIp);
+				        		Socket s = new Socket(remote, 11314);
+				        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(s.getOutputStream())), true);
+				        		out.println("PREVIEW|FILE|"+targetPath);
+
+				        		InputStream sin = s.getInputStream();
+				        		String PreviewName = targetPath.substring(targetPath.lastIndexOf("/")+1, targetPath.length())+"_p2p";
+				        		File PreviewDir = new File("/mnt/sdcard/Uno/Preview");
+				        		if (!PreviewDir.exists()) PreviewDir.mkdirs();
+				        		byte [] buf = new byte[s.getReceiveBufferSize()];
+				        		BufferedOutputStream bout = new BufferedOutputStream(new FileOutputStream(new File(PreviewDir, PreviewName), true)); // append.
+				        		
+				        		while (true)
+				        		{
+				        			int nbytes = sin.read(buf);
+				        			if (nbytes < 0) break;
+				        			bout.write(buf, 0, nbytes);
+				        			bout.flush();
+				        		}
+				        		bout.close();
+				        		
+				        		// Update database.
+				        		String [] row = new String[3];
+								row[0] = "-1";
+								row[1] = "/mnt/sdcard/Uno/Preview/"+PreviewName;
+								row[2] = PreviewName;
+								pdbh.insertRow(row);
+								
+								Toast.makeText(getApplicationContext(), "Retrieve Finished, start previewing...", Toast.LENGTH_LONG).show();
+				        	}
+				        	catch (Exception e)
+				        	{
+				        		Log.e("SocketFile", e.toString());
+				        	}
+						}
+						
+					}.run();
+					
+					// Start showing file preview
+					showPreview(previewPath);
+				}
+				return;
+        	}
+        	catch(Exception e){}
+		}
+		// ----------------------------------------------------------------
+		
 		if (reply.endsWith("NO_RESOURCE")) {
 			Toast.makeText(getApplicationContext(), "Metadata not availble now!", Toast.LENGTH_LONG).show();
 		}
@@ -678,7 +769,7 @@ public class UnoNetwork extends ListActivity {
 			final String resIp = tmp[2];
 			final String path = tmp[3];
 			final String id = NetworkPwdChild.get(pos).ResourceGlobalId;
-			final String previewPath = "/mnt/sdcard/Uno/Preview/"+path.substring(path.lastIndexOf("/")+1, path.length()-1)+"_"+id;
+			final String previewPath = "/mnt/sdcard/Uno/Preview/"+path.substring(path.lastIndexOf("/")+1, path.length())+"_"+id;
 			
 			/*
 			 * Use the following thread to retrieve file and update database.
@@ -694,7 +785,7 @@ public class UnoNetwork extends ListActivity {
 		        		out.println("PREVIEW|FILE|"+path);
 
 		        		InputStream sin = s.getInputStream();
-		        		String PreviewName = path.substring(path.lastIndexOf("/")+1, path.length()-1)+"_"+id;
+		        		String PreviewName = path.substring(path.lastIndexOf("/")+1, path.length())+"_"+id;
 		        		File PreviewDir = new File("/mnt/sdcard/Uno/Preview");
 		        		if (!PreviewDir.exists()) PreviewDir.mkdirs();
 		        		byte [] buf = new byte[s.getReceiveBufferSize()];
