@@ -290,6 +290,25 @@ public class UnoService extends Service {
 						
 					}
 				}
+				else if (argv[1].equals("FILE")) {
+					if (argv[2].equals("METADATA")) {
+						if (argv[3].equals("P2P")) {
+							String [] meta = getLocalFileMetadata(argv[4]);
+							String outMsg = "POST|FILE|METADATA|P2P|";
+							if (meta == null)
+								outMsg += "NO_RESOURCE";
+							else {
+								for (String s: meta)
+									outMsg += s+"%";
+								outMsg = outMsg.substring(0, outMsg.length()-1);
+							}
+							try {
+								DataOutputStream out = new DataOutputStream(client.getOutputStream());
+								out.write(outMsg.getBytes());
+							} catch (IOException e) {}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1198,5 +1217,24 @@ public class UnoService extends Service {
     	try {
     		if (!f.exists()) f.createNewFile();
     	} catch (Exception e) {}
+    }
+	
+	private String [] getLocalFileMetadata (String path)
+    {
+    	File f = new File(path);
+    	if (!f.exists()) return null;
+    	String [] metadata = new String[5];
+
+    	try{
+    		metadata[0] = String.valueOf(new FileInputStream(f).available()/1024);
+    	} catch (Exception e) {}
+    	metadata[1] = (f.canWrite() ? "w":"nw");
+    	metadata[2] = (f.canRead() ? "r":"nr");
+    	metadata[3] = (f.canExecute() ? "x":"nx");
+    	Date d = new Date(f.lastModified());
+    	metadata[4] = d.toGMTString();
+    	
+    	return metadata;
+
     }
 }

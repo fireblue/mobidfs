@@ -239,7 +239,10 @@ public class UnoNetwork extends ListActivity {
 						
 						if (!pwd.split("/")[1].equals(meta[0]) || !pwd.split("/")[2].equals(meta[1])) continue;
 						
-						String response = sendTcpPacket(meta[2], 11314, "GET|DIR|P2P|"+Owner+"|"+pwd);
+						String remoteIp = meta[2];
+						String sendMsg = "GET|DIR|P2P|"+Owner+"|"+pwd;
+						
+						String response = sendTcpPacket(remoteIp, 11314, sendMsg);
 							
 						if (response == null) continue;
 						if (response.equals("POST|DIR|P2P|")) continue;
@@ -315,7 +318,82 @@ public class UnoNetwork extends ListActivity {
 	private void showNetworkFileMetadata(int pos) {
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|FILE|METADATA|"+ 
 				NetworkPwdChild.get(pos).ResourceName+"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
-		if (reply == null) return;
+		
+		/*
+		 * reply == null means server failure, go P2P instead.
+		 * ---------------------------------------------------------------
+		 * */
+		if (reply == null) {
+			String path = NetworkPwd + "/" +NetworkPwdChild.get(pos).ResourceName;
+			String [] tpath = path.split("/");
+			String [] xpath = new String[tpath.length-2];
+			for (int i = 0, k = 0; i < tpath.length; i++) {
+				if (i == 1 || i == 2) continue;
+				xpath[k++] = tpath[i];
+			}
+			
+			File f = new File("/mnt/sdcard/Uno/p2p.ini");
+        	if (!f.exists()) {
+        		Toast.makeText(getApplicationContext(), "System failure...", Toast.LENGTH_LONG).show();
+        		return;
+        	}
+        	FileInputStream fin = null;
+			try {
+				fin = new FileInputStream(f);
+			} catch (FileNotFoundException e) {}
+        	BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+        	
+        	String line = "";
+        	
+        	try {
+				while ((line = br.readLine()) != null) {
+					String [] t = line.split(",");
+					if (!t[0].equals(tpath[1]) || !t[1].equals(tpath[2])) continue;
+					
+					// Get remote resource path.
+					String remotePath = "";
+					for (int i = 0; i < xpath.length; i++) {
+						remotePath += xpath[i] + "/";
+					}
+					remotePath = remotePath.substring(0, remotePath.length()-1);
+					
+					String ans = sendTcpPacket(t[2], 11314, "GET|FILE|METADATA|P2P|" + remotePath);
+					if (ans.equals("POST|FILE|METADATA|P2P|NO_RESOURCE")) {
+						Toast.makeText(getApplicationContext(), "Remote resource not found...", Toast.LENGTH_LONG).show();
+						return;
+					}
+					if (ans.startsWith("POST|FILE|METADATA|P2P|")) {
+						String [] meta = ans.split("\\|")[4].split("%");
+						
+						final String [] attr = new String[5];
+						attr[0] = "File Size: "+meta[0]+" KB";
+						attr[1] = "Writable: "+(meta[1]=="w" ? "Yes":"No");
+						attr[2] = "Readable: "+(meta[2]=="r" ? "Yes":"No");
+						attr[3] = "Executable: "+(meta[3]=="x" ? "Yes":"No");
+						attr[4] = "Last Modified Date: "+meta[4];
+						AlertDialog.Builder metaBuilderP2P = new AlertDialog.Builder(this);
+						metaBuilderP2P.setTitle("File Metadata");
+						metaBuilderP2P.setItems(attr, new DialogInterface.OnClickListener() {
+						    public void onClick(DialogInterface dialog, int item) {
+						    	
+						    }
+						});
+						metaBuilderP2P.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+					           public void onClick(DialogInterface dialog, int id) {
+					        	   dialog.dismiss();
+					           }
+					    });
+						metaBuilderP2P.create().show();
+					}
+					return;
+				}
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		// ---------------------------------------------------------------
 		if (reply.endsWith("NO_RESOURCE")) {
 			Toast.makeText(getApplicationContext(), "Metadata not availble now!", Toast.LENGTH_LONG).show();
 		}
