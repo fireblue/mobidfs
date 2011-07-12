@@ -424,7 +424,94 @@ public class UnoNetwork extends ListActivity {
 	private void pinNetworkFile(int pos) {
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|FILE|PIN|"+ 
 				NetworkPwdChild.get(pos).ResourceName+"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
-		if (reply == null) return;
+		
+		/*
+		 * Here trigger P2P mode.
+		 * ---------------------------------------------------------
+		 * */
+		if (reply == null) {
+			String path = NetworkPwd + "/" +NetworkPwdChild.get(pos).ResourceName;
+			String [] tpath = path.split("/");
+			String [] xpath = new String[tpath.length-2];
+			for (int i = 0, k = 0; i < tpath.length; i++) {
+				if (i == 1 || i == 2) continue;
+				xpath[k++] = tpath[i];
+			}
+			
+			File f = new File("/mnt/sdcard/Uno/p2p.ini");
+        	if (!f.exists()) {
+        		Toast.makeText(getApplicationContext(), "System failure...", Toast.LENGTH_LONG).show();
+        		return;
+        	}
+        	FileInputStream fin = null;
+			try {
+				fin = new FileInputStream(f);
+			} catch (FileNotFoundException e) {}
+        	BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+        	
+        	String line = "";
+        	
+        	try {
+				while ((line = br.readLine()) != null) {
+					String [] t = line.split(",");
+					if (!t[0].equals(tpath[1]) || !t[1].equals(tpath[2])) continue;
+					
+					// Get remote resource path.
+					String remotePath = "";
+					for (int i = 0; i < xpath.length; i++) {
+						remotePath += xpath[i] + "/";
+					}
+					final String targetPath = remotePath.substring(0, remotePath.length()-1);
+					final String targetIp = t[2];
+					new Runnable () {
+
+						public void run() {
+							try
+				        	{
+				        		InetAddress remote = InetAddress.getByName(targetIp);
+				        		Socket s = new Socket(remote, 11314);
+				        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(s.getOutputStream())), true);
+				        		out.println("PIN|FILE|"+targetPath);
+
+				        		InputStream sin = s.getInputStream();
+				        		String PinName = targetPath.substring(targetPath.lastIndexOf("/")+1, targetPath.length())+"_P2P";
+				        		File PinDir = new File("/mnt/sdcard/Uno/Pin");
+				        		if (!PinDir.exists()) PinDir.mkdirs();
+				        		byte [] buf = new byte[s.getReceiveBufferSize()];
+				        		BufferedOutputStream bout = new BufferedOutputStream(new FileOutputStream(new File(PinDir, PinName), true)); // append.
+				        		
+				        		while (true)
+				        		{
+				        			int nbytes = sin.read(buf);
+				        			if (nbytes < 0) break;
+				        			bout.write(buf, 0, nbytes);
+				        			bout.flush();
+				        		}
+				        		bout.close();
+				        		
+				        		// Update database.
+				        		String [] row = new String[3];
+								row[0] = "-1";
+								row[1] = "/mnt/sdcard/Uno/Pin/"+PinName;
+								row[2] = PinName;
+								pdbh.insertRow(row);
+								
+								Toast.makeText(getApplicationContext(), "File has been thumbtacked...", Toast.LENGTH_LONG).show();
+				        	}
+				        	catch (Exception e)
+				        	{
+				        		Log.e("SocketFile", e.toString());
+				        	}
+						}
+						
+					}.run();
+				}
+				return;
+        	}
+        	catch(Exception e){}
+		}
+		
+		// ---------------------------------------------------------
 		if (reply.endsWith("NO_RESOURCE")) {
 			Toast.makeText(getApplicationContext(), "Metadata not availble now!", Toast.LENGTH_LONG).show();
 		}
@@ -448,7 +535,7 @@ public class UnoNetwork extends ListActivity {
 		        		out.println("PIN|FILE|"+path);
 
 		        		InputStream sin = s.getInputStream();
-		        		String PinName = path.substring(path.lastIndexOf("/")+1, path.length()-1)+"_"+id;
+		        		String PinName = path.substring(path.lastIndexOf("/")+1, path.length())+"_"+id;
 		        		File PinDir = new File("/mnt/sdcard/Uno/Pin");
 		        		if (!PinDir.exists()) PinDir.mkdirs();
 		        		byte [] buf = new byte[s.getReceiveBufferSize()];
