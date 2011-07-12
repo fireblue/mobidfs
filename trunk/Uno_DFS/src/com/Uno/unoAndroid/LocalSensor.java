@@ -78,8 +78,8 @@ public class LocalSensor extends ListActivity {
     }
 	
 	@Override
-	public void onStop() {
-		super.onStop();
+	public void onPause() {
+		super.onPause();
 		mComSensorMgr.stopSensor();
 	}
 	

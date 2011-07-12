@@ -76,7 +76,7 @@ public class UnoService extends Service {
 		
 		mSoundMgr = new SoundMeterManager();
 		
-		startFineLocationService();
+		startCoarseLocationService();
 
 		registerReceiver(mBatReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 		
@@ -98,6 +98,7 @@ public class UnoService extends Service {
 		mComSensorMgr.stopSensor();
 		mSoundMgr.stopMesaure();
 		stopCoarseLocationService();
+		
 	}
 	
 	@Override
