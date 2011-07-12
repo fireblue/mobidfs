@@ -208,6 +208,19 @@ public class UnoService extends Service {
 				if (argv[1].equals("SENSOR")) {
 					String sensor = argv[2];
 					String [] res = readSensorValues(sensor);
+					if (res == null) {
+						try {
+							String outgoingMsg = "POST|SENSOR|P2P|NO_RESOURCE";
+							byte [] buf = outgoingMsg.getBytes();
+							DataOutputStream out = new DataOutputStream(client.getOutputStream());
+							out.write(buf);
+							
+							client.close();
+							out.close();
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
 					try {
 						String outgoingMsg = "POST|SENSOR|"+res[0]+"%"+res[1]+"%"+res[2];
 						byte [] buf = outgoingMsg.getBytes();
@@ -224,7 +237,38 @@ public class UnoService extends Service {
 			}
 		}
 		else if (argc == 4) {
-			
+			if (argv[0].equals("GET")) {
+				if (argv[1].equals("SENSOR")) {
+					if (argv[2].equals("P2P")) {
+						String sensor = argv[3];
+						String [] res = readSensorValues(sensor);
+						if (res == null) {
+							try {
+								String outgoingMsg = "POST|SENSOR|P2P|NO_RESOURCE";
+								byte [] buf = outgoingMsg.getBytes();
+								DataOutputStream out = new DataOutputStream(client.getOutputStream());
+								out.write(buf);
+								
+								client.close();
+								out.close();
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+						try {
+							String outgoingMsg = "POST|SENSOR|P2P|"+res[0]+"%"+res[1]+"%"+res[2];
+							byte [] buf = outgoingMsg.getBytes();
+							DataOutputStream out = new DataOutputStream(client.getOutputStream());
+							out.write(buf);
+							
+							client.close();
+							out.close();
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
 		}
 		else if (argc == 5) {
 			if (argv[0].equals("GET")) {

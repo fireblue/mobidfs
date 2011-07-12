@@ -360,7 +360,7 @@ public class UnoNetwork extends ListActivity {
 					String ans = sendTcpPacket(t[2], 11314, "GET|FILE|METADATA|P2P|" + remotePath);
 					if (ans.equals("POST|FILE|METADATA|P2P|NO_RESOURCE")) {
 						Toast.makeText(getApplicationContext(), "Remote resource not found...", Toast.LENGTH_LONG).show();
-						return;
+						continue;
 					}
 					if (ans.startsWith("POST|FILE|METADATA|P2P|")) {
 						String [] meta = ans.split("\\|")[4].split("%");
@@ -572,7 +572,64 @@ public class UnoNetwork extends ListActivity {
 	private void showSensorInstance(int pos) {
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|SENSOR|"+NetworkPwdChild.get(pos).ResourceName+
 				"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
-		if (reply == null) return;
+		
+		/*
+		 * P2P mode to retrieve instant sensor data values.
+		 * */
+		if (reply == null) {
+			String targetHolder = NetworkPwd.split("/")[1];
+			String targetDevice = NetworkPwd.split("/")[2];
+			
+			File f = new File("/mnt/sdcard/Uno/p2p.ini");
+        	if (!f.exists()) {
+        		Toast.makeText(getApplicationContext(), "System failure...", Toast.LENGTH_LONG).show();
+        		return;
+        	}
+        	FileInputStream fin = null;
+			try {
+				fin = new FileInputStream(f);
+			} catch (FileNotFoundException e) {}
+        	BufferedReader br = new BufferedReader(new InputStreamReader(fin));
+        	
+        	String line = "";
+        	
+        	try {
+				while ((line = br.readLine()) != null) {
+					String [] t = line.split(",");
+					if (!t[0].equals(targetHolder) || !t[1].equals(targetDevice)) continue;
+					
+					String ans = sendTcpPacket(t[2], 11314, "GET|SENSOR|P2P|"+NetworkPwdChild.get(pos).ResourceName);
+					if (ans == null) continue;
+					if (ans.equals("POST|SENSOR|P2P|NO_RESOURCE")) {
+						Toast.makeText(getApplicationContext(), "Target sensor not reachable...", Toast.LENGTH_LONG).show();
+						continue;
+					}
+					String [] tmp = ans.split("\\|")[3].split("%");
+					String [] val = new String[3];
+					val[0] = "X: "+tmp[0];
+					val[1] = "Y: "+tmp[1];
+					val[2] = "Z: "+tmp[2];
+					AlertDialog.Builder sensorInsBuilder = new AlertDialog.Builder(this);
+					sensorInsBuilder.setTitle("Sensor Instant Values");
+					sensorInsBuilder.setItems(val, new OnClickListener () {
+		
+						public void onClick(DialogInterface arg0, int arg1) {
+							
+						}});
+					sensorInsBuilder.setNegativeButton("OK", new OnClickListener () {
+		
+						public void onClick(DialogInterface arg0, int arg1) {
+							arg0.dismiss();
+							
+						}});
+					sensorInsBuilder.create().show();
+				}
+				return;
+        	}
+        	catch(Exception e) {}
+		}
+		
+		// ------------------------------------------------
 		if (reply.startsWith("POST|SENSOR|")) {
 			/*
 			 * First go to target mobile device to get sensor values.
@@ -611,6 +668,7 @@ public class UnoNetwork extends ListActivity {
 		
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "GET|FILE|PREVIEW|"+ 
 				NetworkPwdChild.get(pos).ResourceName+"|"+NetworkPwdChild.get(pos).ResourceGlobalId);
+		
 		if (reply == null) return;
 		if (reply.endsWith("NO_RESOURCE")) {
 			Toast.makeText(getApplicationContext(), "Metadata not availble now!", Toast.LENGTH_LONG).show();
