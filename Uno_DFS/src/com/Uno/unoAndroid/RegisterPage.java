@@ -11,6 +11,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Date;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
@@ -54,8 +55,11 @@ public class RegisterPage extends Activity {
     
     private OnClickListener mRegisterKeyListener = new OnClickListener() {
 
-		public void onClick(View arg0) {		
+		public void onClick(View arg0) {
+			
+			long st = startRespondingTimeTrack();
 			RegisterProcess();
+			stopRespondingTimeTrack("REGISTER", st);
 		}
 
     };
@@ -217,6 +221,44 @@ public class RegisterPage extends Activity {
 		}
 		else if (argc == 3) {
 			
+		}
+    }
+    
+    /*
+	 * These code is for evaluation the responding time of the system.
+	 * */
+    private File trackFile = null;
+	private BufferedWriter trackBW = null;
+	
+    private long startRespondingTimeTrack() {
+    	trackFile = new File("/mnt/sdcard/Uno/responding_time.txt");
+    	if (!trackFile.exists()) {
+			try {
+				trackFile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+		try {
+			trackBW = new BufferedWriter(new FileWriter(trackFile, true));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return (new Date()).getTime();
+    }
+    
+    private void stopRespondingTimeTrack(String type, long startTime) {
+    	long duration = new Date().getTime() - startTime;
+    	try {
+			trackBW.write(type + "," + String.valueOf(duration));
+    		trackBW.newLine();
+			trackBW.flush();
+			trackBW.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
     }
 }

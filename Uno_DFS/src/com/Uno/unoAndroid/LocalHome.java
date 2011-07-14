@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -121,7 +122,8 @@ public class LocalHome extends ListActivity {
 	@Override
 	protected void onListItemClick(ListView l, View v, int position, long id) {
 		super.onListItemClick(l, v, position, id);
-		
+		long st = this.startRespondingTimeTrack();
+			
 		Object o = this.getListAdapter().getItem(position);
 		String keyword = o.toString();
 		
@@ -174,15 +176,21 @@ public class LocalHome extends ListActivity {
 			    	if (item == 0) {
 			    		dialog.dismiss();
 			    		//String x = pwd.getAbsolutePath() + "/" + selectedFileName;
+			    		long st = startRespondingTimeTrack();
 			    		showFileMetadata(pwdChild.get(pos).getAbsolutePath());
+			    		stopRespondingTimeTrack("LOCAL_HOME_FILE_METADATA", st);
 			    	}
 			    	else if (item == 1){
 			    		dialog.dismiss();
+			    		long st = startRespondingTimeTrack();
 			    		showFileShare(pwdChild.get(pos).getAbsolutePath());
+			    		stopRespondingTimeTrack("LOCAL_HOME_FILE_SHARE", st);
 			    	}
 			    	else {
 			    		dialog.dismiss();
+			    		long st = startRespondingTimeTrack();
 			    		showPreview(pwdChild.get(pos).getAbsolutePath());
+			    		stopRespondingTimeTrack("LOCAL_HOME_FILE_PREVIEW", st);
 			    	}
 			    }
 			});
@@ -193,6 +201,7 @@ public class LocalHome extends ListActivity {
 		    });
 			optBuilder.create().show();
 		}
+		this.stopRespondingTimeTrack("LOCAL_HOME_CLICK_GENERAL", st);
 	}
 	
 	private void initLoginInfo() {
@@ -472,5 +481,43 @@ public class LocalHome extends ListActivity {
     	{
     		return null;
     	}
+    }
+	
+	/*
+	 * These code is for evaluation the responding time of the system.
+	 * */
+    private File trackFile = null;
+	private BufferedWriter trackBW = null;
+	
+    private long startRespondingTimeTrack() {
+    	trackFile = new File("/mnt/sdcard/Uno/responding_time.txt");
+    	if (!trackFile.exists()) {
+			try {
+				trackFile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+		try {
+			trackBW = new BufferedWriter(new FileWriter(trackFile, true));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return (new Date()).getTime();
+    }
+    
+    private void stopRespondingTimeTrack(String type, long startTime) {
+    	long duration = new Date().getTime() - startTime;
+    	try {
+			trackBW.write(type + "," + String.valueOf(duration));
+    		trackBW.newLine();
+			trackBW.flush();
+			trackBW.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 }

@@ -15,6 +15,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Date;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
@@ -86,7 +87,10 @@ public class LoginPage extends Activity {
 		public void onClick(View arg0) {
 			pgDialog = ProgressDialog.show(LoginPage.this, "", "Login, please wait...", true);
 			pgDialog.show();
+			
+			long st = startRespondingTimeTrack();
 			LoginProcess();
+			stopRespondingTimeTrack("LOGIN", st);
 		}
     	
     };
@@ -112,6 +116,8 @@ public class LoginPage extends Activity {
 			pgDialog.dismiss();
 			return;
 		}
+		
+		
 		
 		String loginMsg = "LOGIN|"+usr+"|"+pwd+"|"+getDeviceMetadata();
 		String reply = sendTcpPacket(GOVERNOR_IP, 11314, loginMsg);
@@ -310,5 +316,42 @@ public class LoginPage extends Activity {
     	try {
     		if (!f.exists()) f.createNewFile();
     	} catch (Exception e) {}
+    }
+    
+    /*
+	 * These code is for evaluation the responding time of the system.
+	 * */
+    private File trackFile = null;
+	private BufferedWriter trackBW = null;
+    private long startRespondingTimeTrack() {
+    	trackFile = new File("/mnt/sdcard/Uno/responding_time.txt");
+    	if (!trackFile.exists()) {
+			try {
+				trackFile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+		try {
+			trackBW = new BufferedWriter(new FileWriter(trackFile, true));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return (new Date()).getTime();
+    }
+    
+    private void stopRespondingTimeTrack(String type, long startTime) {
+    	long duration = new Date().getTime() - startTime;
+    	try {
+			trackBW.write(type + "," + String.valueOf(duration));
+    		trackBW.newLine();
+			trackBW.flush();
+			trackBW.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 }
