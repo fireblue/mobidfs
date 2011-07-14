@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -95,8 +96,8 @@ public class UnoService extends Service {
 		unregisterReceiver(mBatReceiver);
 		tcplist.stop();
 
-		mComSensorMgr.stopSensor();
-		mSoundMgr.stopMesaure();
+		//mComSensorMgr.stopSensor();
+		//mSoundMgr.stopMesaure();
 		stopCoarseLocationService();
 		
 	}
@@ -172,6 +173,7 @@ public class UnoService extends Service {
 			if (argv[0].equals("PIN")) {
 				if (argv[1].equals("FILE")) {
 					
+					long st = startRespondingTimeTrack();
 					try {
 						File f = new File(argv[2]);
 						byte [] buf = new byte[client.getSendBufferSize()];
@@ -185,11 +187,13 @@ public class UnoService extends Service {
 						}
 					}
 					catch (Exception e) {}
+					stopRespondingTimeTrack("SERVICE_PIN_FILE", st);
 				}
 			}
 			else if (argv[0].equals("PREVIEW")) {
 				if (argv[1].equals("FILE")) {
 					
+					long st = startRespondingTimeTrack();
 					try {
 						File f = new File(argv[2]);
 						byte [] buf = new byte[client.getSendBufferSize()];
@@ -203,12 +207,33 @@ public class UnoService extends Service {
 						}
 					}
 					catch (Exception e) {}
+					stopRespondingTimeTrack("SERVICE_PREVIEW_FILE", st);
 				}
 			}
 			else if (argv[0].equals("GET")) {
 				if (argv[1].equals("SENSOR")) {
+					
+					long st = this.startRespondingTimeTrack();
+					
+					/*
+					 * Optimization for sense-on-request.
+					 * */
+					mComSensorMgr.startSensor();
+					mSoundMgr.startMeasure();
+					try {
+						tcplist.sleep(10);
+					} catch (InterruptedException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+					// ----------------------------------
+					
 					String sensor = argv[2];
 					String [] res = readSensorValues(sensor);
+					
+					mComSensorMgr.stopSensor();
+					mSoundMgr.stopMesaure();
+					
 					if (res == null) {
 						try {
 							String outgoingMsg = "POST|SENSOR|P2P|NO_RESOURCE";
@@ -233,7 +258,7 @@ public class UnoService extends Service {
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
-					
+					this.stopRespondingTimeTrack("SERVICE_GET_SENSOR", st);
 				}
 			}
 		}
@@ -241,8 +266,28 @@ public class UnoService extends Service {
 			if (argv[0].equals("GET")) {
 				if (argv[1].equals("SENSOR")) {
 					if (argv[2].equals("P2P")) {
+						
+						long st = this.startRespondingTimeTrack();
+						
+						/*
+						 * Optimization for sense-on-request.
+						 * */
+						mComSensorMgr.startSensor();
+						mSoundMgr.startMeasure();
+						try {
+							tcplist.sleep(10);
+						} catch (InterruptedException e1) {
+							// TODO Auto-generated catch block
+							e1.printStackTrace();
+						}
+						// ----------------------------------
+						
 						String sensor = argv[3];
 						String [] res = readSensorValues(sensor);
+						
+						mComSensorMgr.stopSensor();
+						mSoundMgr.stopMesaure();
+						
 						if (res == null) {
 							try {
 								String outgoingMsg = "POST|SENSOR|P2P|NO_RESOURCE";
@@ -267,6 +312,7 @@ public class UnoService extends Service {
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
+						this.stopRespondingTimeTrack("SERVICE_GET_SENSOR_P2P", st);
 					}
 				}
 			}
@@ -275,6 +321,9 @@ public class UnoService extends Service {
 			if (argv[0].equals("GET")) {
 				if (argv[1].equals("DIR")) {
 					if (argv[2].equals("P2P")) {
+						
+						long st = this.startRespondingTimeTrack();
+						
 						String [] xdir = argv[4].split("/");
 						int nxdir = xdir.length;
 						
@@ -332,12 +381,15 @@ public class UnoService extends Service {
 							DataOutputStream out = new DataOutputStream(client.getOutputStream());
 							out.write(replyMsg.getBytes());
 						} catch (IOException e) {}
-						
+						this.stopRespondingTimeTrack("SERVICE_GET_DIR_P2P", st);
 					}
 				}
 				else if (argv[1].equals("FILE")) {
 					if (argv[2].equals("METADATA")) {
 						if (argv[3].equals("P2P")) {
+							
+							long st = this.startRespondingTimeTrack();
+							
 							String [] meta = getLocalFileMetadata(argv[4]);
 							String outMsg = "POST|FILE|METADATA|P2P|";
 							if (meta == null)
@@ -351,6 +403,8 @@ public class UnoService extends Service {
 								DataOutputStream out = new DataOutputStream(client.getOutputStream());
 								out.write(outMsg.getBytes());
 							} catch (IOException e) {}
+							
+							this.stopRespondingTimeTrack("SERVICE_FILE_METADATA_P2P", st);
 						}
 					}
 				}
@@ -385,7 +439,9 @@ public class UnoService extends Service {
     						String incomingMsg = "";
     						incomingMsg = in.readLine();
 
+    						long st = startRespondingTimeTrack();
     						NetworkMessageParser(mCtx, incomingMsg, client);
+    						stopRespondingTimeTrack("SERVICE_NETWORK_GENERAL_RESPONSE", st);
 						
     						client.close();
     					}
@@ -824,13 +880,13 @@ public class UnoService extends Service {
     	
     	// Start sensing
     	public void startSensor() {
-    		mSensorManager.registerListener(this, this.Accelerometer, SensorManager.SENSOR_DELAY_UI);
-    		mSensorManager.registerListener(this, this.Gyroscopemeter, SensorManager.SENSOR_DELAY_UI);
-    		mSensorManager.registerListener(this, this.Lightmeter, SensorManager.SENSOR_DELAY_UI);
-    		mSensorManager.registerListener(this, this.Magnetometer, SensorManager.SENSOR_DELAY_UI);
-    		mSensorManager.registerListener(this, this.Orientationmeter, SensorManager.SENSOR_DELAY_UI);
-    		mSensorManager.registerListener(this, this.Proximitymeter, SensorManager.SENSOR_DELAY_UI);
-    		mSensorManager.registerListener(this, this.Gravitymeter, SensorManager.SENSOR_DELAY_UI);
+    		mSensorManager.registerListener(this, this.Accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+    		mSensorManager.registerListener(this, this.Gyroscopemeter, SensorManager.SENSOR_DELAY_FASTEST);
+    		mSensorManager.registerListener(this, this.Lightmeter, SensorManager.SENSOR_DELAY_FASTEST);
+    		mSensorManager.registerListener(this, this.Magnetometer, SensorManager.SENSOR_DELAY_FASTEST);
+    		mSensorManager.registerListener(this, this.Orientationmeter, SensorManager.SENSOR_DELAY_FASTEST);
+    		mSensorManager.registerListener(this, this.Proximitymeter, SensorManager.SENSOR_DELAY_FASTEST);
+    		mSensorManager.registerListener(this, this.Gravitymeter, SensorManager.SENSOR_DELAY_FASTEST);
     	}
     	
     	// Stop sensing
@@ -995,50 +1051,59 @@ public class UnoService extends Service {
     }
     
     private String [] readSensorValues (String type) {
-		String [] val = new String[4];
+		String [] val = null;
 		if (type.equals("TYPE_ACCELEROMETER")) {
+			val = new String[4];
 			val[0] = String.valueOf(mComSensorMgr.accX);
 			val[1] = String.valueOf(mComSensorMgr.accY);
 			val[2] = String.valueOf(mComSensorMgr.accZ);
 			val[3] = "N/A";
 		}
 		else if (type.equals("TYPE_GRAVITY")) {
+			val = new String[4];
 			val[0] = String.valueOf(mComSensorMgr.gravityX);
 			val[1] = String.valueOf(mComSensorMgr.gravityY);
 			val[2] = String.valueOf(mComSensorMgr.gravityZ);
 			val[3] = "N/A";
 		}
 		else if (type.equals("TYPE_GYROSCOPE")) {
+			val = new String[4];
 			val[0] = String.valueOf(mComSensorMgr.spin);
 			val[1] = String.valueOf(mComSensorMgr.output);
 			val[2] = String.valueOf(mComSensorMgr.input);
 			val[3] = "N/A";
 		}
 		else if (type.equals("TYPE_LIGHT")) {
+			val = new String[4];
 			val[0] = String.valueOf(mComSensorMgr.light);
 			val[1] = val[2] = val[3] = "N/A";
 		}
 		else if (type.equals("TYPE_MAGNETIC_FIELD")) {
+			val = new String[4];
 			val[0] = String.valueOf(mComSensorMgr.magX);
 			val[1] = String.valueOf(mComSensorMgr.magY);
 			val[2] = String.valueOf(mComSensorMgr.magZ);
 			val[3] = "N/A";
 		}
 		else if (type.equals("TYPE_ORIENTATION")) {
+			val = new String[4];
 			val[0] = String.valueOf(mComSensorMgr.rotationX);
 			val[1] = String.valueOf(mComSensorMgr.rotationY);
 			val[2] = String.valueOf(mComSensorMgr.rotationZ);
 			val[3] = "N/A";
 		}
 		else if (type.equals("TYPE_PROXIMITY")) {
+			val = new String[4];
 			val[0] = String.valueOf(mComSensorMgr.proximity);
 			val[1] = val[2] = val[3] = "N/A";
 		}
 		else if (type.equals("TYPE_SOUNDMETER")) {
+			val = new String[4];
 			val[0] = String.valueOf(UnoService.soundPressureValue);
 			val[1] = val[2] = val[3] = "N/A";
 		}
 		else if (type.equals("LOCATION")) {
+			val = new String[4];
 			val[0] = String.valueOf(UnoService.passiveLatitude);
 			val[1] = String.valueOf(UnoService.passiveLongitude);
 			val[2] = String.valueOf(UnoService.passiveAltitude);
@@ -1281,5 +1346,43 @@ public class UnoService extends Service {
     	
     	return metadata;
 
+    }
+	
+	/*
+	 * These code is for evaluation the responding time of the system.
+	 * */
+    private File trackFile = null;
+	private BufferedWriter trackBW = null;
+	
+    private long startRespondingTimeTrack() {
+    	trackFile = new File("/mnt/sdcard/Uno/responding_time.txt");
+    	if (!trackFile.exists()) {
+			try {
+				trackFile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+		try {
+			trackBW = new BufferedWriter(new FileWriter(trackFile, true));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return (new Date()).getTime();
+    }
+    
+    private void stopRespondingTimeTrack(String type, long startTime) {
+    	long duration = new Date().getTime() - startTime;
+    	try {
+			trackBW.write(type + "," + String.valueOf(duration));
+    		trackBW.newLine();
+			trackBW.flush();
+			trackBW.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 }

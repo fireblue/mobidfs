@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -109,15 +110,21 @@ public class UnoNetwork extends ListActivity {
 					public void onClick(DialogInterface arg0, int arg1) {
 						arg0.dismiss();
 						if (arg1 == 0) {
+							long st = startRespondingTimeTrack();
 							showSensorInstance(pos);
+							stopRespondingTimeTrack("CLIENT_SENSOR_INSTANT", st);
 						}
 						else if (arg1 == 1){
 							// TODO Logging sensor.
+							long st = startRespondingTimeTrack();
 							startLoggingProcess(pos);
+							stopRespondingTimeTrack("CLIENT_SENSOR_LOG_START", st);
 						}
 						else {
 							// TODO stop logging.
+							long st = startRespondingTimeTrack();
 							stopLoggingProcess(pos);
+							stopRespondingTimeTrack("CLIENT_SENSOR_LOG_STOP", st);
 						}
 						
 					}
@@ -138,13 +145,19 @@ public class UnoNetwork extends ListActivity {
 				    public void onClick(DialogInterface dialog, int item) {
 				    	dialog.dismiss();
 				    	if (item == 0) {
+				    		long st = startRespondingTimeTrack();
 				    		showNetworkFileMetadata(pos);
+				    		stopRespondingTimeTrack("CLIENT_NETWORK_FILE_METADATA", st);
 				    	}
 				    	else if (item == 1){
+				    		long st = startRespondingTimeTrack();
 				    		RemoteFilePreviewProcess(pos);
+				    		stopRespondingTimeTrack("CLIENT_NETWORK_FILE_PREVIEW", st);
 				    	}
 				    	else {
+				    		long st = startRespondingTimeTrack();
 				    		pinNetworkFile(pos);
+				    		stopRespondingTimeTrack("CLIENT_NETWORK_FILE_PIN", st);
 				    	}
 				    }
 				});
@@ -868,4 +881,42 @@ public class UnoNetwork extends ListActivity {
 	private void stopLoggingProcess(int pos) {
 		
 	}
+	
+	/*
+	 * These code is for evaluation the responding time of the system.
+	 * */
+    private File trackFile = null;
+	private BufferedWriter trackBW = null;
+	
+    private long startRespondingTimeTrack() {
+    	trackFile = new File("/mnt/sdcard/Uno/responding_time.txt");
+    	if (!trackFile.exists()) {
+			try {
+				trackFile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+		try {
+			trackBW = new BufferedWriter(new FileWriter(trackFile, true));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return (new Date()).getTime();
+    }
+    
+    private void stopRespondingTimeTrack(String type, long startTime) {
+    	long duration = new Date().getTime() - startTime;
+    	try {
+			trackBW.write(type + "," + String.valueOf(duration));
+    		trackBW.newLine();
+			trackBW.flush();
+			trackBW.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
 }

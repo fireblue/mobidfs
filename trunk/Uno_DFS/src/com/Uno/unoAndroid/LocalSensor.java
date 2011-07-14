@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -56,6 +57,8 @@ public class LocalSensor extends ListActivity {
 	private ProgressDialog pgDialog;
 	private CommonSensorManager mComSensorMgr;
 	private HashMap <String, String> SENSOR_NAME_MAP;
+	private SoundMeterManager mSoundMgr;
+	private Double soundPressureValue = 0.0;
 	
 	private LocalResourceDatabaseHelper resdbh = null;
 	private String Owner = null;
@@ -74,24 +77,36 @@ public class LocalSensor extends ListActivity {
         adapter = new SensorAdapter(LocalSensor.this, valuelist);
         setListAdapter(adapter);
         mComSensorMgr = new CommonSensorManager();
-        //mComSensorMgr.startSensor();
+        mSoundMgr = new SoundMeterManager();
+        mComSensorMgr.startSensor();
+        mSoundMgr.startMeasure();
     }
 	
 	@Override
 	public void onPause() {
 		super.onPause();
 		mComSensorMgr.stopSensor();
+		mSoundMgr.stopMesaure();
 	}
 	
 	@Override
 	public void onResume() {
 		super.onResume();
 		mComSensorMgr.startSensor();
+		mSoundMgr.startMeasure();
+	}
+	
+	@Override
+	public void onDestroy() {
+		super.onDestroy();
+		mComSensorMgr.stopSensor();
+		mSoundMgr.stopMesaure();
 	}
 	
 	@Override
 	protected void onListItemClick(ListView l, View v, int position, long id) {
 		super.onListItemClick(l, v, position, id);
+		long st = this.startRespondingTimeTrack();
 		
 		final String [] options = {"Share to Everyone", "Share to Friends", "Offline"};
 		AlertDialog.Builder optBuilder = new AlertDialog.Builder(this);
@@ -100,6 +115,8 @@ public class LocalSensor extends ListActivity {
 		optBuilder.setItems(options, new DialogInterface.OnClickListener() {
 		    public void onClick(DialogInterface dialog, int item) {
 		    	if (item == 0) {
+		    		long st = startRespondingTimeTrack();
+		    		
 		    		pgDialog = ProgressDialog.show(LocalSensor.this, "", "Synchronizing to Server. Please wait...", true);
 		    		pgDialog.show();
 		    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "SETPUBLIC|SENSOR|"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName));
@@ -133,6 +150,7 @@ public class LocalSensor extends ListActivity {
 			    		row[6] = "";
 		    			resdbh.updateRow(row);
 		    		}
+		    		stopRespondingTimeTrack("LOCAL_SENSOR_SHARE_TO_EVERYONE", st);
 		    	}
 		    	else if (item == 1) {
 		    		pgDialog = ProgressDialog.show(LocalSensor.this, "", "Synchronizing to Server. Please wait...", true);
@@ -142,6 +160,8 @@ public class LocalSensor extends ListActivity {
 		    	else {
 		    		pgDialog = ProgressDialog.show(LocalSensor.this, "", "Synchronizing to Server. Please wait...", true);
 		    		pgDialog.show();
+		    		
+		    		long st = startRespondingTimeTrack();
 		    		String reply = sendTcpPacket(GOVERNOR_IP, 11314, "OFFLINE|SENSOR|"+SENSOR_NAME_MAP.get(valuelist.get(pos).SensorName));
 		    		if (reply == null) return;
 		    		GovernorMessageParser(reply);
@@ -173,6 +193,8 @@ public class LocalSensor extends ListActivity {
 			    		row[6] = "";
 		    			resdbh.updateRow(row);
 		    		}
+		    		
+		    		stopRespondingTimeTrack("LOCAL_SENSOR_OFFLINE", st);
 		    	}
 		    }
 		});
@@ -182,9 +204,13 @@ public class LocalSensor extends ListActivity {
 	           }
 	    });
 		optBuilder.create().show();
+		
+		this.stopRespondingTimeTrack("LOCAL_SENSOR_CLICK_GENERAL", st);
 	}
 	
 	private void initLoginInfo() {
+		long st = this.startRespondingTimeTrack();
+		
 		FileInputStream fin = null;
 		try {
 			fin = new FileInputStream("/mnt/sdcard/Uno/login.ini");
@@ -196,6 +222,8 @@ public class LocalSensor extends ListActivity {
 			br.close();
 			fin.close();
 		} catch (IOException e) {}
+		
+		this.stopRespondingTimeTrack("LOCAL_SENSOR_initLoginInfo()", st);
 	}
 	
 	private void showAccessList(String sensor) {
@@ -218,6 +246,8 @@ public class LocalSensor extends ListActivity {
 
 			public void onClick(View arg0) {
 				accAlert.dismiss();
+				
+				long st = startRespondingTimeTrack();
 				
 				String accesslist = acclist.getText().toString().replace(";", "&");
 				
@@ -252,6 +282,8 @@ public class LocalSensor extends ListActivity {
 		    		row[6] = "";
 	    			resdbh.updateRow(row);
 	    		}
+	    		
+	    		stopRespondingTimeTrack("LOCAL_SENSOR_SHARE_TO_FRIENDS", st);
 			}});
 		btCancel.setOnClickListener(new OnClickListener () {
 
@@ -560,7 +592,7 @@ public class LocalSensor extends ListActivity {
     		SensorValues entry = new SensorValues();
 	    	entry = new SensorValues();
 	   		entry.SensorName = "Soundmeter";
-	   		entry.valueX = String.valueOf(UnoService.soundPressureValue);
+	   		entry.valueX = String.valueOf(soundPressureValue);
 	   		entry.valueY = entry.valueZ = "N/A";
 	   		entry.Accuracy = "0";
     		valuelist.set(7, entry);  
@@ -578,5 +610,136 @@ public class LocalSensor extends ListActivity {
     	public void onAccuracyChanged(Sensor sensor, int accuracy) {
         
     	}
+    }
+	
+private class SoundMeterManager extends Thread {
+    	
+    	private boolean isRunning = false;
+    	private HashMap <String, FileOutputStream> logSoundmeterHashMap = new HashMap <String, FileOutputStream>();
+    	private double SoundPressure;
+    	private AudioRecord mrec = null;
+    	private String soundmeterBasePath = "/mnt/sdcard/Uno/SensorLogs/TYPE_SOUNDMETER";
+    	private int BufferSize = 0;
+    	
+    	public SoundMeterManager() {
+    		BufferSize = 2*AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    		mrec = new AudioRecord(MediaRecorder.AudioSource.MIC, 44100, AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_16BIT, BufferSize);
+    		isRunning = false;
+    		SoundPressure = 0.0;
+    	}
+    	
+    	public double getSoundPressure() {
+    		return this.SoundPressure;
+    	}
+    	
+    	public void startMeasure() {
+    		isRunning = true;
+    		try {
+    			this.start();
+    		} catch (Exception e) {}
+    	}
+    	
+    	public void stopMesaure() {
+    		isRunning = false;
+    	}
+    	
+    	public void startLoggingSoundmeter(String requestor) throws IOException {
+    		
+    		File dir = new File(this.soundmeterBasePath);
+    		if (!dir.exists()) dir.mkdirs();
+    		
+    		File f = new File(this.soundmeterBasePath+"/"+requestor);
+    		f.deleteOnExit();
+    		f.createNewFile();
+    		
+    		this.logSoundmeterHashMap.put(requestor, new FileOutputStream(f));
+    	}
+    	
+    	public void stopLogging(String requestor) throws IOException {
+    		this.logSoundmeterHashMap.get(requestor).close();
+    		this.logSoundmeterHashMap.remove(requestor);
+    	}
+    	
+    	public void resetAllLogs() throws IOException {
+    		for (String key: this.logSoundmeterHashMap.keySet()) {
+    			this.logSoundmeterHashMap.get(key).close();
+    			this.logSoundmeterHashMap.remove(key);
+    		}
+    	}
+    	
+    	private void writeLog(double value) throws IOException {
+
+    		Date cur = new Date();
+    		String rec = cur.toGMTString()+","+String.valueOf(value)+"\n";
+    		byte [] buf = rec.getBytes();
+    		
+    		for (String key: this.logSoundmeterHashMap.keySet()) {
+    			this.logSoundmeterHashMap.get(key).write(buf);
+    			this.logSoundmeterHashMap.get(key).flush();
+    		}
+    	}
+    	
+    	@Override
+    	public void run() {
+    		mrec.startRecording();
+    		while (isRunning) {
+    			short [] tmpBuf = new short[BufferSize];
+    			mrec.read(tmpBuf, 0, BufferSize);
+    			double sum = 0.0;
+    			for (int i = 0; i < BufferSize; i++)
+    				sum += Math.abs(tmpBuf[i]);
+    			SoundPressure = 20.0*Math.log10(sum/BufferSize);
+    			soundPressureValue = SoundPressure;
+    			try {
+					writeLog(SoundPressure);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+    		}
+    		if (mrec != null) {
+    			mrec.stop();
+    			mrec.release();
+    			mrec = null;
+    		}
+    	}
+    }
+	
+	/*
+	 * These code is for evaluation the responding time of the system.
+	 * */
+    private File trackFile = null;
+	private BufferedWriter trackBW = null;
+	
+    private long startRespondingTimeTrack() {
+    	trackFile = new File("/mnt/sdcard/Uno/responding_time.txt");
+    	if (!trackFile.exists()) {
+			try {
+				trackFile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+		try {
+			trackBW = new BufferedWriter(new FileWriter(trackFile, true));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return (new Date()).getTime();
+    }
+    
+    private void stopRespondingTimeTrack(String type, long startTime) {
+    	long duration = new Date().getTime() - startTime;
+    	try {
+			trackBW.write(type + "," + String.valueOf(duration));
+    		trackBW.newLine();
+			trackBW.flush();
+			trackBW.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 }
