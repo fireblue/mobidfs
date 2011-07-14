@@ -77,7 +77,7 @@ public class UnoService extends Service {
 		
 		mSoundMgr = new SoundMeterManager();
 		
-		startCoarseLocationService();
+		//startCoarseLocationService();
 
 		registerReceiver(mBatReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 		
@@ -98,7 +98,7 @@ public class UnoService extends Service {
 
 		//mComSensorMgr.stopSensor();
 		//mSoundMgr.stopMesaure();
-		stopCoarseLocationService();
+		//stopCoarseLocationService();
 		
 	}
 	
@@ -218,21 +218,42 @@ public class UnoService extends Service {
 					/*
 					 * Optimization for sense-on-request.
 					 * */
-					mComSensorMgr.startSensor();
-					mSoundMgr.startMeasure();
+					String [] res = new String[4];
+					String sensor = argv[2];
 					try {
-						tcplist.sleep(10);
+						if (sensor.equals("TYPE_SOUNDMETER")) {
+							mSoundMgr.startMeasure();
+							tcplist.sleep(1000);
+							res = readSensorValues(sensor);
+							mSoundMgr.stopMesaure();
+						}
+						else if (sensor.equals("LOCATION")) {
+							boolean locReady = true;
+							if (Math.abs(this.passiveLatitude) < 1.0 && 
+									Math.abs(this.passiveLongitude) < 1.0 && 
+									Math.abs(this.passiveAccuracy) < 1.0)
+								locReady = false;
+							if (!locReady) {
+								startCoarseLocationService();
+								tcplist.sleep(1000);
+								res = readSensorValues(sensor);
+								stopCoarseLocationService();
+							}
+							else {
+								res = readSensorValues(sensor);
+							}
+						}
+						else {
+							mComSensorMgr.startSensor();
+							tcplist.sleep(10);
+							res = readSensorValues(sensor);
+							mComSensorMgr.stopSensor();
+						}
 					} catch (InterruptedException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
 					}
 					// ----------------------------------
-					
-					String sensor = argv[2];
-					String [] res = readSensorValues(sensor);
-					
-					mComSensorMgr.stopSensor();
-					mSoundMgr.stopMesaure();
 					
 					if (res == null) {
 						try {
@@ -272,21 +293,42 @@ public class UnoService extends Service {
 						/*
 						 * Optimization for sense-on-request.
 						 * */
-						mComSensorMgr.startSensor();
-						mSoundMgr.startMeasure();
+						String [] res = new String[4];
+						String sensor = argv[2];
 						try {
-							tcplist.sleep(10);
+							if (sensor.equals("TYPE_SOUNDMETER")) {
+								mSoundMgr.startMeasure();
+								tcplist.sleep(1000);
+								res = readSensorValues(sensor);
+								mSoundMgr.stopMesaure();
+							}
+							else if (sensor.equals("LOCATION")) {
+								boolean locReady = true;
+								if (Math.abs(this.passiveLatitude) < 1.0 && 
+										Math.abs(this.passiveLongitude) < 1.0 && 
+										Math.abs(this.passiveAccuracy) < 1.0)
+									locReady = false;
+								if (!locReady) {
+									startCoarseLocationService();
+									tcplist.sleep(1000);
+									res = readSensorValues(sensor);
+									stopCoarseLocationService();
+								}
+								else {
+									res = readSensorValues(sensor);
+								}
+							}
+							else {
+								mComSensorMgr.startSensor();
+								tcplist.sleep(10);
+								res = readSensorValues(sensor);
+								mComSensorMgr.stopSensor();
+							}
 						} catch (InterruptedException e1) {
 							// TODO Auto-generated catch block
 							e1.printStackTrace();
 						}
 						// ----------------------------------
-						
-						String sensor = argv[3];
-						String [] res = readSensorValues(sensor);
-						
-						mComSensorMgr.stopSensor();
-						mSoundMgr.stopMesaure();
 						
 						if (res == null) {
 							try {
@@ -1106,8 +1148,8 @@ public class UnoService extends Service {
 			val = new String[4];
 			val[0] = String.valueOf(UnoService.passiveLatitude);
 			val[1] = String.valueOf(UnoService.passiveLongitude);
-			val[2] = String.valueOf(UnoService.passiveAltitude);
-			val[3] = String.valueOf(UnoService.passiveAccuracy);
+			val[2] = String.valueOf(UnoService.passiveAccuracy);
+			val[3] = String.valueOf(UnoService.passiveAltitude);
 		}
 		
 		return val;
