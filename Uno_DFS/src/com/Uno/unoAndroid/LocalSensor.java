@@ -32,6 +32,11 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -80,6 +85,7 @@ public class LocalSensor extends ListActivity {
         mSoundMgr = new SoundMeterManager();
         mComSensorMgr.startSensor();
         mSoundMgr.startMeasure();
+        startCoarseLocationService();
     }
 	
 	@Override
@@ -87,6 +93,7 @@ public class LocalSensor extends ListActivity {
 		super.onPause();
 		mComSensorMgr.stopSensor();
 		mSoundMgr.stopMesaure();
+		stopCoarseLocationService();
 	}
 	
 	@Override
@@ -94,6 +101,7 @@ public class LocalSensor extends ListActivity {
 		super.onResume();
 		mComSensorMgr.startSensor();
 		mSoundMgr.startMeasure();
+		startCoarseLocationService();
 	}
 	
 	@Override
@@ -101,6 +109,7 @@ public class LocalSensor extends ListActivity {
 		super.onDestroy();
 		mComSensorMgr.stopSensor();
 		mSoundMgr.stopMesaure();
+		stopCoarseLocationService();
 	}
 	
 	@Override
@@ -705,6 +714,115 @@ private class SoundMeterManager extends Thread {
     	}
     }
 	
+	/*
+	 * This part is to do location service.
+	 * */
+	
+	private LocationManager mLocationMgr = null;
+
+	private LocationListener coarseListener = new LocationListener() {
+	
+		public void onLocationChanged(Location location) {
+			UnoService.passiveLatitude = location.getLatitude();
+			UnoService.passiveLongitude = location.getLongitude();
+			UnoService.passiveAltitude = location.getAltitude();
+			UnoService.passiveAccuracy = location.getAccuracy();
+			
+		}
+	
+		public void onProviderDisabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+	
+		public void onProviderEnabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+	
+		public void onStatusChanged(String provider, int status, Bundle extras) {
+			// TODO Auto-generated method stub
+			
+		}
+		
+	};
+	
+	private LocationListener fineListener = new LocationListener() {
+	
+		public void onLocationChanged(Location location) {
+			UnoService.passiveLatitude = location.getLatitude();
+			UnoService.passiveLongitude = location.getLongitude();
+			UnoService.passiveAltitude = location.getAltitude();
+			UnoService.passiveAccuracy = location.getAccuracy();
+			
+		}
+	
+		public void onProviderDisabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+	
+		public void onProviderEnabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+	
+		public void onStatusChanged(String provider, int status, Bundle extras) {
+			// TODO Auto-generated method stub
+			
+		}
+		
+	};
+	
+	private Criteria createCoarseCriteria() {
+		Criteria c = new Criteria();
+		c.setAccuracy(Criteria.ACCURACY_COARSE);
+		c.setAltitudeRequired(false);
+		//c.setAccuracy(100);
+		c.setBearingAccuracy(Criteria.ACCURACY_COARSE);
+		//c.setBearingRequired(false);
+		c.setSpeedRequired(false);
+		c.setCostAllowed(true);
+		c.setPowerRequirement(Criteria.POWER_LOW);
+		return c;
+	}
+	
+	private Criteria createFineCriteria() {
+		Criteria c = new Criteria();
+		c.setAccuracy(Criteria.ACCURACY_FINE);
+		c.setAltitudeRequired(false);
+		//c.setBearingRequired(false);
+		c.setBearingAccuracy(Criteria.ACCURACY_FINE);
+		c.setSpeedRequired(false);
+		c.setCostAllowed(true);
+		c.setPowerRequirement(Criteria.POWER_HIGH);
+		return c;
+	}
+	
+	private void startCoarseLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createCoarseCriteria(), true));
+		mLocationMgr.requestLocationUpdates(locp.getName(), 0, 0, coarseListener);
+	}
+	
+	private void stopCoarseLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createCoarseCriteria(), true));
+		mLocationMgr.removeUpdates(coarseListener);
+	}
+	
+	private void startFineLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createFineCriteria(), true));
+		mLocationMgr.requestLocationUpdates(locp.getName(), 0, 0, fineListener);
+	}
+	
+	private void stopFineLocationService() {
+		mLocationMgr = (LocationManager) getSystemService(LOCATION_SERVICE);
+		LocationProvider locp = mLocationMgr.getProvider(mLocationMgr.getBestProvider(createCoarseCriteria(), true));
+		mLocationMgr.removeUpdates(fineListener);
+	}
+
 	/*
 	 * These code is for evaluation the responding time of the system.
 	 * */
