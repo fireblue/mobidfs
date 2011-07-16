@@ -85,7 +85,8 @@ public class LocalSensor extends ListActivity {
         mSoundMgr = new SoundMeterManager();
         mComSensorMgr.startSensor();
         mSoundMgr.startMeasure();
-        startCoarseLocationService();
+        //startCoarseLocationService();
+        startFineLocationService();
     }
 	
 	@Override
@@ -93,7 +94,8 @@ public class LocalSensor extends ListActivity {
 		super.onPause();
 		mComSensorMgr.stopSensor();
 		mSoundMgr.stopMesaure();
-		stopCoarseLocationService();
+		//stopCoarseLocationService();
+		stopFineLocationService();
 	}
 	
 	@Override
@@ -101,7 +103,8 @@ public class LocalSensor extends ListActivity {
 		super.onResume();
 		mComSensorMgr.startSensor();
 		mSoundMgr.startMeasure();
-		startCoarseLocationService();
+		//startCoarseLocationService();
+		startFineLocationService();
 	}
 	
 	@Override
@@ -109,7 +112,8 @@ public class LocalSensor extends ListActivity {
 		super.onDestroy();
 		mComSensorMgr.stopSensor();
 		mSoundMgr.stopMesaure();
-		stopCoarseLocationService();
+		//stopCoarseLocationService();
+		stopFineLocationService();
 	}
 	
 	@Override
