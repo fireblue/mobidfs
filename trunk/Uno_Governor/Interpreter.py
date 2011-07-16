@@ -391,8 +391,6 @@ def parseCommand(message, clientAddr):
                     return "POST|SENSOR|NO_SENSOR";
                 acclist = res[0][5];
                 tacclist = acclist.split("&");
-                print user;
-                print tacclist;
                 if acclist == "0" or (user not in tacclist and acclist != "1"):
                     return "POST|SENSOR|ACCESS_DENY";
                 owner = res[0][2];
@@ -437,6 +435,36 @@ def parseCommand(message, clientAddr):
                     Database.updateDB(conn, query);
                     return "SETPRIVATE|FILE|DONE";
         if argv[0] == "GET":
+            if argv[1] == "SENSOR":
+                if argv[2] == "LOG":
+                    sensor = argv[3];
+                    sensorid = argv[4];
+                    ip = clientAddr[0];
+                    query = "SELECT * FROM `devices` WHERE `DEVICE_IP`='"+ip \
+                            +"' AND `ALIVE`='1';";
+                    res = Database.matrixReadDB(conn, query);
+                    if len(res) == 0:
+                        return "POST|SENSOR|LOG|NO_RESOURCE";
+                    user = res[0][1];
+                    query = "SELECT * FROM `resources` WHERE `ID`='"+sensorid \
+                            +"' AND `RESOURCE_NAME`='"+sensor+"';";
+                    res = Database.matrixReadDB(conn, query);
+                    if len(res) == 0:
+                        return "POST|SENSOR|LOG|NO_RESOURCE";
+                    acclist = res[0][5];
+                    tacclist = acclist.split("&");
+                    if acclist == "0" or (user not in tacclist and acclist != "1"):
+                        return "POST|SENSOR|LOG|NO_RESOURCE";
+                    owner = res[0][2];
+                    devname = res[0][3];
+                    query = "SELECT * FROM `devices` WHERE `DEVICE_OWNER`='"+ \
+                            owner+"' AND `DEVICE_NAME`='"+devname+"';";
+                    res = Database.matrixReadDB(conn, query);
+                    if len(res) == 0:
+                        return "POST|SENSOR|LOG|NO_RESOURCE";
+                    ownerip = res[0][3];
+                    return "POST|SENSOR|LOG|"+ownerip;
+                
             if argv[1] == "FILE":
                 if argv[2] == "METADATA":
                     resname = argv[3];
