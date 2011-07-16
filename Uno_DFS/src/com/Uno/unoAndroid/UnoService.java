@@ -234,10 +234,12 @@ public class UnoService extends Service {
 									Math.abs(this.passiveAccuracy) < 1.0)
 								locReady = false;
 							if (!locReady) {
-								startCoarseLocationService();
+								startFineLocationService();
+								//startCoarseLocationService();
 								tcplist.sleep(1000);
 								res = readSensorValues(sensor);
-								stopCoarseLocationService();
+								stopFineLocationService();
+								//stopCoarseLocationService();
 							}
 							else {
 								res = readSensorValues(sensor);
@@ -284,7 +286,28 @@ public class UnoService extends Service {
 			}
 		}
 		else if (argc == 4) {
-			if (argv[0].equals("GET")) {
+			if (argv[0].equals("PIN")) {
+				if (argv[1].equals("SENSOR_LOG")) {
+					String sensor = argv[2];
+					String requestor = argv[3];
+					String path = "/mnt/sdcard/Uno/SensorLogs/"+sensor+"/"+requestor;
+					
+					try {
+						File f = new File(path);
+						byte [] buf = new byte[client.getSendBufferSize()];
+						FileInputStream fis = new FileInputStream(f);
+						BufferedInputStream bis = new BufferedInputStream(fis);
+						OutputStream os = client.getOutputStream();
+						while (bis.read(buf) > 0) {
+							os.write(buf);
+							os.flush();
+							buf = new byte[client.getSendBufferSize()];
+						}
+					}
+					catch (Exception e) {}
+				}
+			}
+			else if (argv[0].equals("GET")) {
 				if (argv[1].equals("SENSOR")) {
 					if (argv[2].equals("P2P")) {
 						
@@ -447,6 +470,75 @@ public class UnoService extends Service {
 							} catch (IOException e) {}
 							
 							this.stopRespondingTimeTrack("SERVICE_FILE_METADATA_P2P", st);
+						}
+					}
+				}
+			}
+		}
+		else if (argc == 6) {
+			if (argv[0].equals("GET")) {
+				if (argv[1].equals("SENSOR")) {
+					if (argv[2].equals("LOG")) {
+						if (argv[3].equals("START")) {
+							String sensor = argv[4];
+							String owner = argv[5];
+							mComSensorMgr.startSensor();
+							
+							try {
+								if (sensor.equals("TYPE_ACCELEROMETER"))
+									mComSensorMgr.startLoggingAccelerometer(owner);
+								else if (sensor.equals("TYPE_GRAVITY"))
+									mComSensorMgr.startLoggingGravitymeter(owner);
+								else if (sensor.equals("TYPE_GYROSCOPE")) 
+									mComSensorMgr.startLoggingGyroscopemeter(owner);
+								else if (sensor.equals("TYPE_LIGHT"))
+									mComSensorMgr.startLoggingLightmeter(owner);
+								else if (sensor.equals("TYPE_MAGNETIC_FIELD"))
+									mComSensorMgr.startLoggingMagnetometer(owner);
+								else if (sensor.equals("TYPE_ORIENTATION"))
+									mComSensorMgr.startLoggingOrientationmeter(owner);
+								else if (sensor.equals("TYPE_PROXIMITY"))
+									mComSensorMgr.startLoggingProximitymeter(owner);
+								
+								try {
+									DataOutputStream out = new DataOutputStream(client.getOutputStream());
+									out.write("POST|SENSOR|LOG|OK".getBytes());
+								} catch (IOException e) {}
+							}
+							catch (Exception e) {}
+							
+						}
+						
+						else if (argv[3].equals("STOP")) {
+							
+							String sensor = argv[4];
+							String owner = argv[5];
+							
+							try {
+								if (sensor.equals("TYPE_ACCELEROMETER"))
+									mComSensorMgr.stopLoggingAccelerometer(owner);
+								else if (sensor.equals("TYPE_GRAVITY"))
+									mComSensorMgr.stopLoggingGravitymeter(owner);
+								else if (sensor.equals("TYPE_GYROSCOPE")) 
+									mComSensorMgr.stopLoggingGyroscopemeter(owner);
+								else if (sensor.equals("TYPE_LIGHT"))
+									mComSensorMgr.stopLoggingLightmeter(owner);
+								else if (sensor.equals("TYPE_MAGNETIC_FIELD"))
+									mComSensorMgr.stopLoggingMagnetometer(owner);
+								else if (sensor.equals("TYPE_ORIENTATION"))
+									mComSensorMgr.stopLoggingOrientationmeter(owner);
+								else if (sensor.equals("TYPE_PROXIMITY"))
+									mComSensorMgr.stopLoggingProximitymeter(owner);
+								
+								if (!mComSensorMgr.isLocked())
+									mComSensorMgr.stopSensor();
+								
+								try {
+									DataOutputStream out = new DataOutputStream(client.getOutputStream());
+									out.write("POST|SENSOR|LOG|OK".getBytes());
+								} catch (IOException e) {}
+							}
+							catch (Exception e) {}
 						}
 					}
 				}
@@ -667,6 +759,7 @@ public class UnoService extends Service {
     private class CommonSensorManager implements SensorEventListener {
     	
     	private SensorManager mSensorManager;
+    	private int numberOfLoggingUsers = 0;
     	
     	// sensor log control.
     	private HashMap <String, FileOutputStream> logAccelerometerHashMap = new HashMap <String, FileOutputStream>();
@@ -764,11 +857,15 @@ public class UnoService extends Service {
     		f.createNewFile();
     		FileOutputStream os = new FileOutputStream(f);
     		logAccelerometerHashMap.put(requestor, os);
+    		
+    		numberOfLoggingUsers++;
     	}
     	
     	public void stopLoggingAccelerometer(String requestor) throws IOException {
     		logAccelerometerHashMap.get(requestor).close();
     		logAccelerometerHashMap.remove(requestor);
+    		
+    		numberOfLoggingUsers--;
     	}
     	
     	// Gyroscopemeter
@@ -782,11 +879,15 @@ public class UnoService extends Service {
     		f.createNewFile();
     		FileOutputStream os = new FileOutputStream(f);
     		logGyroscopemeterHashMap.put(requestor, os);
+    		
+    		numberOfLoggingUsers++;
     	}
     	
     	public void stopLoggingGyroscopemeter(String requestor) throws IOException {
     		logGyroscopemeterHashMap.get(requestor).close();
     		logGyroscopemeterHashMap.remove(requestor);
+    		
+    		numberOfLoggingUsers--;
     	}
     	
     	// Lightmeter
@@ -800,11 +901,15 @@ public class UnoService extends Service {
     		f.createNewFile();
     		FileOutputStream os = new FileOutputStream(f);
     		logLightmeterHashMap.put(requestor, os);
+    		
+    		numberOfLoggingUsers++;
     	}
     	
     	public void stopLoggingLightmeter(String requestor) throws IOException {
     		logLightmeterHashMap.get(requestor).close();
     		logLightmeterHashMap.remove(requestor);
+    		
+    		numberOfLoggingUsers--;
     	}
     	
     	// Magnetometer
@@ -818,11 +923,15 @@ public class UnoService extends Service {
     		f.createNewFile();
     		FileOutputStream os = new FileOutputStream(f);
     		logMagnetometerHashMap.put(requestor, os);
+    		
+    		numberOfLoggingUsers++;
     	}
     	
     	public void stopLoggingMagnetometer(String requestor) throws IOException {
     		logMagnetometerHashMap.get(requestor).close();
     		logMagnetometerHashMap.remove(requestor);
+    		
+    		numberOfLoggingUsers--;
     	}
     	
     	// Orientationmeter
@@ -836,11 +945,15 @@ public class UnoService extends Service {
     		f.createNewFile();
     		FileOutputStream os = new FileOutputStream(f);
     		logOrientationmeterHashMap.put(requestor, os);
+    		
+    		numberOfLoggingUsers++;
     	}
     	
     	public void stopLoggingOrientationmeter(String requestor) throws IOException {
     		logOrientationmeterHashMap.get(requestor).close();
     		logOrientationmeterHashMap.remove(requestor);
+    		
+    		numberOfLoggingUsers--;
     	}
     	
     	// Proximitymeter
@@ -854,11 +967,15 @@ public class UnoService extends Service {
     		f.createNewFile();
     		FileOutputStream os = new FileOutputStream(f);
     		logProximitymeterHashMap.put(requestor, os);
+    		
+    		numberOfLoggingUsers++;
     	}
     	
     	public void stopLoggingProximitymeter(String requestor) throws IOException {
     		logProximitymeterHashMap.get(requestor).close();
     		logProximitymeterHashMap.remove(requestor);
+    		
+    		numberOfLoggingUsers--;
     	}
     	
     	// Gravitymeter
@@ -872,17 +989,23 @@ public class UnoService extends Service {
     		f.createNewFile();
     		FileOutputStream os = new FileOutputStream(f);
     		logGravitymeterHashMap.put(requestor, os);
+    		
+    		numberOfLoggingUsers++;
     	}
     	
     	public void stopLoggingGravitymeter(String requestor) throws IOException {
     		logGravitymeterHashMap.get(requestor).close();
     		logGravitymeterHashMap.remove(requestor);
+    		
+    		numberOfLoggingUsers--;
     	}
     	
     	/*
     	 * Reset All logs.
     	 * */
     	public void resetAllLogs() throws IOException {
+    		
+    		numberOfLoggingUsers = 0;
     		
     		for (String key: this.logAccelerometerHashMap.keySet()) {
     			this.logAccelerometerHashMap.get(key).close();
@@ -942,6 +1065,12 @@ public class UnoService extends Service {
     		mSensorManager.unregisterListener(this, this.Gravitymeter);
     	}
     	
+    	// Check sensor is locked by logging.
+    	public boolean isLocked() {
+    		if (numberOfLoggingUsers > 0) return true;
+    		else return false;
+    	}
+    	
     	public void onSensorChanged(SensorEvent event) {
     		
     		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
@@ -951,7 +1080,7 @@ public class UnoService extends Service {
     			this.accZ = event.values[2]-this.gravityZ;
     			
     			Date d = new Date();
-				String str = d.toGMTString()+":"+String.valueOf(this.accX) + ";" 
+				String str = d.toGMTString()+"|"+String.valueOf(this.accX) + ";" 
 						+ String.valueOf(this.accY) + ";" + String.valueOf(this.accZ) + "\n";
 				byte [] buf = str.getBytes();
 				
@@ -972,7 +1101,7 @@ public class UnoService extends Service {
     			this.input = event.values[2];
     			
     			Date d = new Date();
-				String str = d.toGMTString()+":"+String.valueOf(this.spin) + ";" 
+				String str = d.toGMTString()+"|"+String.valueOf(this.spin) + ";" 
 						+ String.valueOf(this.output) + ";" + String.valueOf(this.input)+"\n";
 				byte [] buf = str.getBytes();
 				
@@ -991,7 +1120,7 @@ public class UnoService extends Service {
     			this.light = event.values[0];
     			
     			Date d = new Date();
-				String str = d.toGMTString()+":"+String.valueOf(this.light)+"\n";
+				String str = d.toGMTString()+"|"+String.valueOf(this.light)+"\n";
 				byte [] buf = str.getBytes();
 				
 				for (String key: this.logLightmeterHashMap.keySet()) {
@@ -1011,7 +1140,7 @@ public class UnoService extends Service {
     			this.magZ = event.values[2];
     			
     			Date d = new Date();
-				String str = d.toGMTString()+":"+String.valueOf(this.magX) + ";" 
+				String str = d.toGMTString()+"|"+String.valueOf(this.magX) + ";" 
 						+ String.valueOf(this.magY) + ";" + String.valueOf(this.magZ)+"\n";
 				byte [] buf = str.getBytes();
     			
@@ -1032,7 +1161,7 @@ public class UnoService extends Service {
     			this.rotationZ = event.values[2];
     			
     			Date d = new Date();
-				String str = d.toGMTString()+":"+String.valueOf(this.rotationX) + ";" 
+				String str = d.toGMTString()+"|"+String.valueOf(this.rotationX) + ";" 
 						+ String.valueOf(this.rotationY) + ";" + String.valueOf(this.rotationZ)+"\n";
 				byte [] buf = str.getBytes();
 
@@ -1051,7 +1180,7 @@ public class UnoService extends Service {
     			this.proximity = event.values[0];
     			
     			Date d = new Date();
-				String str = d.toGMTString()+":"+String.valueOf(this.proximity) + "\n";
+				String str = d.toGMTString()+"|"+String.valueOf(this.proximity) + "\n";
 				byte [] buf = str.getBytes();
 
 				for (String key: this.logProximitymeterHashMap.keySet()) {
@@ -1071,7 +1200,7 @@ public class UnoService extends Service {
     			this.gravityZ = event.values[2];
     			
     			Date d = new Date();
-				String str = d.toGMTString()+":"+String.valueOf(this.gravityX) + ";" 
+				String str = d.toGMTString()+"|"+String.valueOf(this.gravityX) + ";" 
 					+ String.valueOf(this.gravityY) + ";" + String.valueOf(this.gravityZ)+"\n";
 				byte [] buf = str.getBytes();
 

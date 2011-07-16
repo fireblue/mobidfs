@@ -102,7 +102,7 @@ public class UnoNetwork extends ListActivity {
 			 * */
 			if (NetworkPwd.endsWith("/Sensors")) {
 				
-				final String [] options = {"Sensor Instance", "Sensor Logging", "Stop Logging"};
+				final String [] options = {"Instant Reading", "Sensor Logging", "Stop Logging"};
 				AlertDialog.Builder optBuilder = new AlertDialog.Builder(this);
 				optBuilder.setTitle("Actions");
 				optBuilder.setSingleChoiceItems(options, -1, new DialogInterface.OnClickListener() {
@@ -875,11 +875,124 @@ public class UnoNetwork extends ListActivity {
 	 * Logging operations, username can be found in /mnt/sdcard/Uno/sys.ini
 	 * */
 	private void startLoggingProcess(int pos) {
+		String sensor = NetworkPwdChild.get(pos).ResourceName;
+		String sensorid = NetworkPwdChild.get(pos).ResourceGlobalId;
 		
+		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "GET|SENSOR|LOG|"+sensor+"|"+sensorid);
+		
+		/*
+		 * P2P mode.
+		 * */
+		if (reply == null) {
+			return;
+		}
+		// ----------------------------------
+		
+		if (reply.equals("POST|SENSOR|LOG|NO_RESOURCE")) {
+			Toast.makeText(getApplicationContext(), "Sensor is not availble...", Toast.LENGTH_LONG).show();
+			return;
+		}
+		if (reply.startsWith("POST|SENSOR|LOG|")) {
+			String targetIp = reply.split("\\|")[3];
+			String response = sendTcpPacket(targetIp, 11314, "GET|SENSOR|LOG|START|"+sensor+"|"+Owner);
+			if (response == null) {
+				Toast.makeText(getApplicationContext(), "No response from target sensor...", Toast.LENGTH_LONG).show();
+				return;
+			}
+			
+			// This function is not ready yet. It will trigger new log.
+			if (response.equals("POST|SENSOR|LOG|IN_GOING")) {
+				Toast.makeText(getApplicationContext(), "You are already in use of the sensor...", Toast.LENGTH_LONG).show();
+				return;
+			}
+			
+			if (response.equals("POST|SENSOR|LOG|OK")) {
+				Toast.makeText(getApplicationContext(), "Start sensing for you...", Toast.LENGTH_LONG).show();
+				return;
+			}
+		}
 	}
 	
 	private void stopLoggingProcess(int pos) {
+		String sensor = NetworkPwdChild.get(pos).ResourceName;
+		String sensorid = NetworkPwdChild.get(pos).ResourceGlobalId;
 		
+		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "GET|SENSOR|LOG|"+sensor+"|"+sensorid);
+		
+		/*
+		 * P2P mode.
+		 * */
+		if (reply == null) {
+			return;
+		}
+		// ----------------------------------
+		
+		if (reply.equals("POST|SENSOR|LOG|NO_RESOURCE")) {
+			Toast.makeText(getApplicationContext(), "Sensor is not availble...", Toast.LENGTH_LONG).show();
+			return;
+		}
+		if (reply.startsWith("POST|SENSOR|LOG|")) {
+			String targetIp = reply.split("\\|")[3];
+			String response = sendTcpPacket(targetIp, 11314, "GET|SENSOR|LOG|STOP|"+sensor+"|"+Owner);
+			if (response == null) {
+				Toast.makeText(getApplicationContext(), "No response from target sensor...", Toast.LENGTH_LONG).show();
+				return;
+			}
+			if (response.equals("POST|SENSOR|LOG|OK")) {
+				Toast.makeText(getApplicationContext(), "Stop sensing for you and fetch log...", Toast.LENGTH_LONG).show();
+				
+				final String resIp = targetIp;
+				final String targetSensor = sensor;
+				final String targetId = sensorid;
+				
+				/*
+				 * New runnable thread to retreive a sensor log.
+				 * */
+				
+				new Runnable () {
+
+					public void run() {
+						try
+			        	{
+			        		InetAddress remote = InetAddress.getByName(resIp);
+			        		Socket s = new Socket(remote, 11314);
+			        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(s.getOutputStream())), true);
+			        		out.println("PIN|SENSOR_LOG|"+targetSensor+"|"+Owner);
+
+			        		InputStream sin = s.getInputStream();
+			        		String SensorLogName = targetSensor + "_" + String.valueOf(new Date().getTime());
+			        		File SensorLogDir = new File("/mnt/sdcard/Uno/Pin/SensorLogs");
+			        		if (!SensorLogDir.exists()) SensorLogDir.mkdirs();
+			        		byte [] buf = new byte[s.getReceiveBufferSize()];
+			        		BufferedOutputStream bout = new BufferedOutputStream(new FileOutputStream(new File(SensorLogDir, SensorLogName), true)); // append.
+			        		
+			        		while (true)
+			        		{
+			        			int nbytes = sin.read(buf);
+			        			if (nbytes < 0) break;
+			        			bout.write(buf, 0, nbytes);
+			        			bout.flush();
+			        		}
+			        		bout.close();
+			        		
+			        		// Update database.
+			        		String [] row = new String[3];
+							row[0] = targetId;
+							row[1] = "/mnt/sdcard/Uno/Pin/SensorLogs/"+SensorLogName;
+							row[2] = SensorLogName;
+							pdbh.insertRow(row);
+							
+							Toast.makeText(getApplicationContext(), "Sensor Log fetched...", Toast.LENGTH_LONG).show();
+			        	}
+			        	catch (Exception e)
+			        	{
+			        		Log.e("SocketFile", e.toString());
+			        	}
+					}
+					
+				}.run();
+			}
+		}
 	}
 	
 	/*
