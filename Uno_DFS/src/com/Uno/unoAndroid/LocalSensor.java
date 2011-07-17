@@ -154,6 +154,7 @@ public class LocalSensor extends ListActivity {
 			    		resdbh.insertRow(row);
 		    		}
 		    		else {
+		    			c.moveToFirst();
 		    			String [] row = resdbh.fetchOneRow(c);
 		    			row[1] = Owner;
 			    		row[2] = Device;
@@ -197,6 +198,7 @@ public class LocalSensor extends ListActivity {
 			    		resdbh.insertRow(row);
 		    		}
 		    		else {
+		    			c.moveToFirst();
 		    			String [] row = resdbh.fetchOneRow(c);
 		    			row[1] = Owner;
 			    		row[2] = Device;
@@ -286,6 +288,7 @@ public class LocalSensor extends ListActivity {
 		    		resdbh.insertRow(row);
 	    		}
 	    		else {
+	    			c.moveToFirst();
 	    			String [] row = resdbh.fetchOneRow(c);
 	    			row[1] = Owner;
 		    		row[2] = Device;
