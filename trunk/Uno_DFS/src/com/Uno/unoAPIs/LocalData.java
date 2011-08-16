@@ -46,6 +46,7 @@ public class LocalData {
 		this.dataLocalName = path.substring(path.lastIndexOf("/")+1, path.length());
 		this.dataAccessList = "0";
 		this.statusInCloud = "offline";
+		this.metaData = retrieveMetadata(path);
 	}
 	
 	public LocalData(File rf) {
@@ -53,6 +54,7 @@ public class LocalData {
 		this.dataLocalName = rf.getName();
 		this.dataAccessList = "0";
 		this.statusInCloud = "offline";
+		this.metaData = retrieveMetadata(rf.getAbsolutePath());
 	}
 	
 	/*
