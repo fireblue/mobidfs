@@ -38,7 +38,9 @@ public class CloudManager {
 	
 	public LocalData pull(RemoteData rd) {return null;}
 	
-	public LocalSensor pull(RemoteSensor rs) {return null;}
+	public RemoteData pull(String path) {return null;}
+	
+	public RemoteSensor pull(String path, int type) {return null;}
 	
 	/*
 	 * Search methods

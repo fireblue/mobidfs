@@ -1,5 +1,9 @@
 package com.Uno.unoAPIs;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.Date;
+
 public class LocalData {
 
 	/*
@@ -38,14 +42,37 @@ public class LocalData {
 	 * Constructors.
 	 * */
 	public LocalData(String path) {
-		// TODO create the init information.
+		this.dataLocalPath = path;
+		this.dataLocalName = path.substring(path.lastIndexOf("/")+1, path.length());
+		this.dataAccessList = "0";
+		this.statusInCloud = "offline";
+	}
+	
+	public LocalData(File rf) {
+		this.dataLocalPath = rf.getAbsolutePath();
+		this.dataLocalName = rf.getName();
+		this.dataAccessList = "0";
+		this.statusInCloud = "offline";
 	}
 	
 	/*
 	 * Local methods
 	 * */
-	private String retrieveMetadata(String path) {
-		// TODO create metadata string.
-		return null;
-	}
+	private String retrieveMetadata (String path)
+    {
+    	File f = new File(path);
+    	if (!f.exists()) return null;
+    	String metadata = "";
+
+    	try{
+    		metadata += String.valueOf(new FileInputStream(f).available()/1024)+"%";
+    	} catch (Exception e) {}
+    	metadata += (f.canWrite() ? "w":"nw")+"%";
+    	metadata += (f.canRead() ? "r":"nr")+"%";
+    	metadata += (f.canExecute() ? "x":"nx")+"%";
+    	Date d = new Date(f.lastModified());
+    	metadata += d.toGMTString();
+    	
+    	return metadata;
+    }
 }
