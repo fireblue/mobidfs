@@ -1,5 +1,13 @@
 package com.Uno.unoAPIs;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.Socket;
+
 public class RemoteData {
 	
 	/*
@@ -22,14 +30,33 @@ public class RemoteData {
 	}
 	
 	public boolean isAccessible() {
+		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "API|GET|REMOTEDATA|ACCESS|"+this.dataRemotePath);
+		if (reply == null) {
+			// TODO go to peer-to-peer.
+			return false;
+		}
+		if (reply.equals("API|POST|REMOTEDATA|ACCESS|YES"))
+			this.isAccessible = true;
+		else if (reply.equals("API|POST|REMOTEDATA|ACCESS|NO"))
+			this.isAccessible = false;
 		
-		// TODO update info.
 		return this.isAccessible;
 	}
 	
 	public String getMetadata() {
-		
-		// TODO retrieve info.
+		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "API|GET|REMOTEDATA|METADATA|"+this.dataRemotePath);
+		if (reply == null) {
+			// TODO go to peer-to-peer.
+			return null;
+		}
+		if (reply.equals("API|POST|REMOTEDATA|METADATA|DENIED")) {
+			this.isAccessible = false; // denied.
+			return null;
+		}
+		if (reply.startsWith("API|POST|REMOTEDATA|METADATA")) {
+			this.metaData = reply.split("\\|")[4];
+		}
+		// Attention: this metadata is separated by % for each section.
 		return this.metaData;
 	}
 	
@@ -37,10 +64,27 @@ public class RemoteData {
 	 * Constructors.
 	 * */
 	public RemoteData(String path) {
-		// TODO create the init information.
+		this.dataRemoteName = path.substring(path.lastIndexOf("/")+1, path.length());
+		this.dataRemotePath = path;
 	}
 	
 	/*
 	 * Local methods
 	 * */
+	private String sendTcpPacket(String ip, int port, String msg) {
+    	try	{
+    		InetAddress remoteAddr = InetAddress.getByName(ip);
+    		Socket socket = new Socket(remoteAddr, port);
+    		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+    		out.println(msg);
+    		BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    		String reply = in.readLine();
+    		socket.close();
+    		return reply;
+    	}
+    	catch (Exception e)
+    	{
+    		return null;
+    	}
+    }
 }
