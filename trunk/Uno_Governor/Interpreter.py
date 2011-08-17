@@ -494,7 +494,7 @@ def parseCommand(message, clientAddr):
                         return "POST|FILE|PIN|NO_RESOURCE";
                     ip = res[0][3];
                     return "POST|FILE|"+ip+"|"+path;
-		elif argv[2] == "PREVIEW":
+				elif argv[2] == "PREVIEW":
                     resname = argv[3];
                     resid = argv[4];
                     query = "SELECT * FROM `resources` WHERE `RESOURCE_NAME`='"+resname \
@@ -512,6 +512,53 @@ def parseCommand(message, clientAddr):
                         return "POST|FILE|PREVIEW|NO_RESOURCE";
                     ip = res[0][3];
                     return "POST|FILE|"+ip+"|"+path;
+		if argv[0] == "API":
+			if argv[1] == "GET":
+				if argv[2] == "REMOTEDATA":
+					if argv[3] == "ACCESS":
+						t = argv[4].split("/");
+						owner = t[1];
+						device = t[2];
+						path = argv[4]][len(owner)+len(device)+2:];
+						query = "SELECT * FROM `devices` WHERE `DEVICE_IP`='"+clientAddr[0]+"';";
+						res = Database.matrixReadDB(conn, query);
+						if len(res) == 0:
+							return "API|POST|REMOTEDATA|ACCESS|NO";
+						else:
+							user = res[0][1];
+						query = "SELECT * FROM `resources` WHERE `RESOURCE_OWNER`='"+owner \
+							+"' AND `RESOURCE_DEVICE`='"+device \
+							+"' AND `RESOURCE_PATH`='"+path+"';";
+						res = Database.matrixReadDB(conn, query);
+						if len(res) == 0:
+							return "API|POST|REMOTEDATA|ACCESS|NO";
+						acclist = res[0][5].split("&");
+						if user not in acclist:
+							return "API|POST|REMOTEDATA|ACCESS|NO";
+						else:
+							return "API|POST|REMOTEDATA|ACCESS|YES";
+					elif argv[3] == "METADATA":
+						t = argv[4].split("/");
+						owner = t[1];
+						device = t[2];
+						path = argv[4]][len(owner)+len(device)+2:];
+						query = "SELECT * FROM `devices` WHERE `DEVICE_IP`='"+clientAddr[0]+"';";
+						res = Database.matrixReadDB(conn, query);
+						if len(res) == 0:
+							return "API|POST|REMOTEDATA|METADATA|DENIED";
+						else:
+							user = res[0][1];
+						query = "SELECT * FROM `resources` WHERE `RESOURCE_OWNER`='"+owner \
+							+"' AND `RESOURCE_DEVICE`='"+device \
+							+"' AND `RESOURCE_PATH`='"+path+"';";
+						res = Database.matrixReadDB(conn, query);
+						if len(res) == 0:
+							return "API|POST|REMOTEDATA|METADATA|DENIED";
+						acclist = res[0][5].split("&");
+						if user not in acclist:
+							return "API|POST|REMOTEDATA|METADATA|DENIED";
+						else:
+							return "API|POST|REMOTEDATA|METADATA|"+res[0][6];
 
     else:
         pass;
