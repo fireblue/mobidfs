@@ -610,6 +610,34 @@ def parseCommand(message, clientAddr):
 								return "API|POST|REMOTESENSOR|INSTANTREADING|DENIED";
 							else:
 								return "API|POST|REMOTESENSOR|INSTANTREADING|"+xres[0][3];
+					if argv[3] == "LOGGING":
+						t = argv[4].split("/");
+						owner = t[1];
+						device = t[2];
+						path = argv[4][len(owner)+len(device)+2:];
+						query = "SELECT * FROM `devices` WHERE `DEVICE_IP`='"+clientAddr[0]+"';";
+						res = Database.matrixReadDB(conn, query);
+						if len(res) == 0:
+							return "API|POST|REMOTESENSOR|LOGGING|DENIED";
+						else:
+							user = res[0][1];
+						query = "SELECT * FROM `resources` WHERE `RESOURCE_OWNER`='"+owner \
+							+"' AND `RESOURCE_DEVICE`='"+device \
+							+"' AND `RESOURCE_PATH`='"+path+"';";
+						res = Database.matrixReadDB(conn, query);
+						if len(res) == 0:
+							return "API|POST|REMOTESENSOR|LOGGING|DENIED";
+						acclist = res[0][5].split("&");
+						if user not in acclist:
+							return "API|POST|REMOTESENSOR|LOGGING|DENIED";
+						else:
+							query = "SELECT * FROM `devices` WHERE `DEVICE_OWNER`='"+res[0][2] \
+								+"' AND `DEVICE_NAME`='"+res[0][3]+"';";
+							xres = Database.matrixReadDB(conn, query);
+							if len(xres) == 0:
+								return "API|POST|REMOTESENSOR|LOGGING|DENIED";
+							else:
+								return "API|POST|REMOTESENSOR|LOGGING|"+xres[0][3];
 
     else:
         pass;
