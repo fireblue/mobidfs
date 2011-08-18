@@ -474,6 +474,63 @@ public class UnoService extends Service {
 					}
 				}
 			}
+			else if (argv[0].equals("API")) {
+				if (argv[1].equals("GET")) {
+					if (argv[2].equals("REMOTESENSOR")) {
+						if (argv[3].equals("INSTANTREADING")) {
+							String sensor = argv[4];
+							String [] res = new String[4];
+							
+							/*
+							 * Optimization of Sense-on-Request.
+							 * */
+							try {
+								if (sensor.equals("TYPE_SOUNDMETER")) {
+									mSoundMgr.startMeasure();
+									tcplist.sleep(1000);
+									res = readSensorValues(sensor);
+									mSoundMgr.stopMesaure();
+								}
+								else if (sensor.equals("LOCATION")) {
+									boolean locReady = true;
+									if (Math.abs(this.passiveLatitude) < 1.0 && 
+											Math.abs(this.passiveLongitude) < 1.0 && 
+											Math.abs(this.passiveAccuracy) < 1.0)
+										locReady = false;
+									if (!locReady) {
+										startCoarseLocationService();
+										tcplist.sleep(1000);
+										res = readSensorValues(sensor);
+										stopCoarseLocationService();
+									}
+									else {
+										res = readSensorValues(sensor);
+									}
+								}
+								else {
+									mComSensorMgr.startSensor();
+									tcplist.sleep(10);
+									res = readSensorValues(sensor);
+									mComSensorMgr.stopSensor();
+								}
+							} catch (InterruptedException e1) {}
+							// ----------------------------------------------------------
+							/*
+							 * Send out results.
+							 * */
+							try {
+								String outgoingMsg = "API|POST|REMOTESENSOR|INSTANTREADING|"+res[0]+"%"+res[1]+"%"+res[2];
+								byte [] buf = outgoingMsg.getBytes();
+								DataOutputStream out = new DataOutputStream(client.getOutputStream());
+								out.write(buf);
+								
+								client.close();
+								out.close();
+							} catch (Exception e) {}
+						}
+					}
+				}
+			}
 		}
 		else if (argc == 6) {
 			if (argv[0].equals("GET")) {
@@ -539,6 +596,75 @@ public class UnoService extends Service {
 								} catch (IOException e) {}
 							}
 							catch (Exception e) {}
+						}
+					}
+				}
+			}
+		}
+		else if (argc == 7) {
+			if (argv[0].equals("API")) {
+				if (argv[1].equals("GET")) {
+					if (argv[2].equals("REMOTESENSOR")) {
+						if (argv[3].equals("LOGGING")) {
+							if (argv[4].equals("START")) {
+								String owner = argv[5];
+								String sensor = argv[6];
+								
+								mComSensorMgr.startSensor();
+								
+								try {
+									if (sensor.equals("TYPE_ACCELEROMETER"))
+										mComSensorMgr.startLoggingAccelerometer(owner);
+									else if (sensor.equals("TYPE_GRAVITY"))
+										mComSensorMgr.startLoggingGravitymeter(owner);
+									else if (sensor.equals("TYPE_GYROSCOPE")) 
+										mComSensorMgr.startLoggingGyroscopemeter(owner);
+									else if (sensor.equals("TYPE_LIGHT"))
+										mComSensorMgr.startLoggingLightmeter(owner);
+									else if (sensor.equals("TYPE_MAGNETIC_FIELD"))
+										mComSensorMgr.startLoggingMagnetometer(owner);
+									else if (sensor.equals("TYPE_ORIENTATION"))
+										mComSensorMgr.startLoggingOrientationmeter(owner);
+									else if (sensor.equals("TYPE_PROXIMITY"))
+										mComSensorMgr.startLoggingProximitymeter(owner);
+									
+									try {
+										DataOutputStream out = new DataOutputStream(client.getOutputStream());
+										out.write("API|POST|REMOTESENSOR|LOGGING|START|YES".getBytes());
+									} catch (IOException e) {}
+								}
+								catch (Exception e) {}
+							}
+							else if (argv[4].equals("STOP")) {
+								String owner = argv[5];
+								String sensor = argv[6];
+								
+								try {
+									if (sensor.equals("TYPE_ACCELEROMETER"))
+										mComSensorMgr.stopLoggingAccelerometer(owner);
+									else if (sensor.equals("TYPE_GRAVITY"))
+										mComSensorMgr.stopLoggingGravitymeter(owner);
+									else if (sensor.equals("TYPE_GYROSCOPE")) 
+										mComSensorMgr.stopLoggingGyroscopemeter(owner);
+									else if (sensor.equals("TYPE_LIGHT"))
+										mComSensorMgr.stopLoggingLightmeter(owner);
+									else if (sensor.equals("TYPE_MAGNETIC_FIELD"))
+										mComSensorMgr.stopLoggingMagnetometer(owner);
+									else if (sensor.equals("TYPE_ORIENTATION"))
+										mComSensorMgr.stopLoggingOrientationmeter(owner);
+									else if (sensor.equals("TYPE_PROXIMITY"))
+										mComSensorMgr.stopLoggingProximitymeter(owner);
+									
+									if (!mComSensorMgr.isLocked())
+										mComSensorMgr.stopSensor();
+									
+									try {
+										DataOutputStream out = new DataOutputStream(client.getOutputStream());
+										out.write("API|POST|REMOTESENSOR|LOGGING|STOP|YES".getBytes());
+									} catch (IOException e) {}
+								}
+								catch (Exception e) {}
+							}
 						}
 					}
 				}

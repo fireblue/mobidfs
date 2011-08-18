@@ -1,12 +1,20 @@
 package com.Uno.unoAPIs;
 
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Date;
+
+import android.util.Log;
+import android.widget.Toast;
 
 public class RemoteSensor {
 
@@ -33,6 +41,7 @@ public class RemoteSensor {
 		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "API|GET|REMOTESENSOR|ACCESS|"+this.sensorRemotePath);
 		if (reply == null) {
 			// TODO peer-to-peer.
+			return false;
 		}
 		if (reply.equals("API|POST|REMOTESENSOR|ACCESS|NO"))
 			this.isAccessible = false;
@@ -45,15 +54,15 @@ public class RemoteSensor {
 		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "API|GET|REMOTESENSOR|INSTANTREADING|"+this.sensorRemotePath);
 		if (reply == null) {
 			// TODO peer-to-peer.
-		}
-		if (reply.equals("API|GET|REMOTESENSOR|INSTANTREADING|DENIED")) {
 			return null;
 		}
-		if (reply.startsWith("API|GET|REMOTESENSOR|INSTANTREADING")) {
-			// TODO the UnoService part.
-			String response = sendTcpPacket(reply.split("//|")[4], 11314, "API|GET|INSTANTREADING|"+this.sensorRemoteName);
+		if (reply.equals("API|POST|REMOTESENSOR|INSTANTREADING|DENIED")) {
+			return null;
+		}
+		if (reply.startsWith("API|POST|REMOTESENSOR|INSTANTREADING")) {
+			String response = sendTcpPacket(reply.split("//|")[4], 11314, "API|GET|REMOTESENSOR|INSTANTREADING|"+this.sensorRemoteName);
 			if (response == null) return null;
-			if (response.startsWith("API|POST|INSTANTREADING")) {
+			if (response.startsWith("API|POST|REMOTESENSOR|INSTANTREADING")) {
 				this.readings = response.split("\\|")[3].split("%");
 			}
 			return this.readings;
@@ -62,9 +71,95 @@ public class RemoteSensor {
 		return null;
 	}
 	
-	public void startRemoteLogging() {}
+	// Start a particular sensor logging process. 
+	public boolean startRemoteLogging() {
+		// First contact server.
+		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "API|GET|REMOTESENSOR|LOGGING|"+this.sensorRemotePath);
+		if (reply == null) {
+			// TODO peer-to-peer.
+			return false;
+		}
+		if (reply.equals("API|POST|REMOTESENSOR|LOGGING|DENIED")) return false;
+		if (reply.startsWith("API|POST|REMOTESENSOR|LOGGING")) {
+			String response = sendTcpPacket(reply.split("\\|")[4], 11314, "API|GET|REMOTESENSOR|LOGGING|START|"+UnoConstant.Owner+"|"+this.sensorRemoteName);
+			if (response == null) return false;
+			if (response.equals("API|GET|REMOTESENSOR|LOGGING|START|YES")) return true;
+			else return false;
+		}
+		return false;
+	}
 	
-	public void stopRemoteLogging() {}
+	// Stop the logging process. 
+	public boolean stopRemoteLogging() {
+		// First contact server.
+		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "API|GET|REMOTESENSOR|LOGGING|"+this.sensorRemotePath);
+		if (reply == null) {
+			// TODO peer-to-peer.
+			return false;
+		}
+		if (reply.equals("API|POST|REMOTESENSOR|LOGGING|DENIED")) return false;
+		if (reply.startsWith("API|POST|REMOTESENSOR|LOGGING")) {
+			String response = sendTcpPacket(reply.split("\\|")[4], 11314, "API|GET|REMOTESENSOR|LOGGING|STOP|"+UnoConstant.Owner+"|"+this.sensorRemoteName);
+			if (response == null) return false;
+			if (response.equals("API|GET|REMOTESENSOR|LOGGING|STOP|YES")) return true;
+			else return false;
+		}
+		return false;
+	}
+	
+	// Fetch a log.
+	public boolean fetchLogs(String localPath) {
+		// First contact server.
+		String reply = sendTcpPacket(UnoConstant.GOVERNOR_ADDRESS, 11314, "API|GET|REMOTESENSOR|LOGGING|"+this.sensorRemotePath);
+		if (reply == null) {
+			// TODO peer-to-peer.
+			return false;
+		}
+		if (reply.equals("API|POST|REMOTESENSOR|LOGGING|DENIED")) return false;
+		if (reply.startsWith("API|POST|REMOTESENSOR|LOGGING")) {
+			final String owner = UnoConstant.Owner;
+			final String sensor = this.sensorRemoteName;
+			final String ip = reply.split("\\|")[4];
+			final String path = localPath;
+			new Runnable () {
+
+				@Override
+				public void run() {
+					try
+		        	{
+		        		InetAddress remote = InetAddress.getByName(ip);
+		        		Socket s = new Socket(remote, 11314);
+		        		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(s.getOutputStream())), true);
+		        		out.println("PIN|SENSOR_LOG|"+sensor+"|"+owner);
+
+		        		InputStream sin = s.getInputStream();
+		        		File f = new File(path.substring(0, path.lastIndexOf("/")));
+		        		if (!f.exists()) f.mkdirs();
+		        		File xf = new File(path);
+		        		if (!xf.exists()) xf.createNewFile();
+		        		byte [] buf = new byte[s.getReceiveBufferSize()];
+		        		BufferedOutputStream bout = new BufferedOutputStream(new FileOutputStream(xf, true)); // append.
+		        		
+		        		while (true)
+		        		{
+		        			int nbytes = sin.read(buf);
+		        			if (nbytes < 0) break;
+		        			bout.write(buf, 0, nbytes);
+		        			bout.flush();
+		        		}
+		        		bout.close();	
+		        	}
+		        	catch (Exception e)
+		        	{
+		        		Log.e("SocketFile", e.toString());
+		        	}
+					
+				}}.run();
+			
+		}
+		return true;
+	}
+	
 	
 	/*
 	 * Constructors.
