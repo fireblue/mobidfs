@@ -76,7 +76,7 @@ public class LocalSensor {
 			this.readings[0] = String.valueOf(this.soundMgr.SoundLevel);
 			return this.readings;
 		}
-		else if (this.localSensorType.equals("TYPE_LOCATION")) {
+		else if (this.localSensorType.equals("LOCATION")) {
 			this.startCoarseLocationService();
 			try {
 				Thread.sleep(5000);
@@ -126,7 +126,7 @@ public class LocalSensor {
 		this.ctx = c;
 		if (name.equals("TYPE_SOUNDMETER"))
 			this.soundMgr = new SoundMeterManager();
-		else if (name.equals("TYPE_LOCATION"))
+		else if (name.equals("LOCATION"))
 			this.mLocationMgr = (LocationManager) this.ctx.getSystemService(Context.LOCATION_SERVICE);
 		else
 			this.comSensorMgr = new CommonSensorManager(this.ctx);
